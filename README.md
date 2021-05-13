@@ -41,7 +41,8 @@ git clone https://github.com/polkamusic/PolkaMusic-Core
 cd polkamusic
 ```
 
-- [X] Install RustLang with necessary dependencies
+- [X] Install RustLang with necessary dependencies as [illustrated here](doc/rust-setup.md).  
+
 
 ### Commands
 
@@ -81,3 +82,54 @@ Command to purge the development chain's state:
 ### Specs
 
 - This chain uses ```substrate``` v3.0.0
+
+## Web Interface
+A web interface for developers is available at this url:  [https://ipfs.io/ipns/dotapps.io](https://ipfs.io/ipns/dotapps.io)  
+You should select your node address, for example ws://127.0.0.1:9944 
+
+## Functions Available:
+
+The callable functions aredivided in module (pallets), here the main modules:  
+
+### Balances
+
+The Balances module provides functions for:  
+- Getting and setting free balances.  
+- Retrieving total, reserved and unreserved balances.  
+- Repatriating a reserved balance to a beneficiary account that exists.  
+- Transferring a balance between accounts (when not reserved).  
+- Slashing an account balance.  
+- Account creation and removal.  
+- Managing total issuance.  
+- Setting and managing locks.  
+
+Terminology:  
+- Existential Deposit: The minimum balance required to create or keep an account open. This prevents "dust accounts" from filling storage. When the free plus the reserved balance (i.e. the total balance) fall below this, then the account is said to be dead; and it loses its functionality as well as any prior history and all information on it is removed from the chain's state. No account should ever have a total balance that is strictly between 0 and the existential deposit (exclusive). If this ever happens, it indicates either a bug in this pallet or an erroneous raw mutation of storage.  
+- Total Issuance: The total number of units in existence in a system.  
+- Reaping an account: The act of removing an account by resetting its nonce. Happens after its total balance has become zero (or, strictly speaking, less than the Existential Deposit).  
+- Free Balance: The portion of a balance that is not reserved. The free balance is the only balance that matters for most operations.  
+- Reserved Balance: Reserved balance still belongs to the account holder, but is suspended. Reserved balance can still be slashed, but only after all the free balance has been slashed.
+- Imbalance: A condition when some funds were credited or debited without equal and opposite accounting (i.e. a difference between total issuance and account balances). Functions that result in an imbalance will return an object of the Imbalance trait that can be managed within your runtime logic. (If an imbalance is simply dropped, it should automatically maintain any book-keeping such as total issuance.)  
+- Lock: A freeze on a specified amount of an account's free balance until a specified block number. Multiple locks always operate over the same funds, so they "overlay" rather than "stack".  
+
+Transactions  (Existrinsics):
+- setBalance(who, new_free, new_reserved) - Set the balances of a given account, it's allowed only by SUDO calls (super user access).  
+- transfer(dest, value) - Transfer some liquid free balance to another account.  
+- forceTransfer(source, dest, value) - Exactly as `transfer`, except the origin must be the super user by a SUDO calls and the source account may be different.  
+- transferKeepAlive(dest, value) - Same as the [`transfer`] call, but with a check that the transfer will not kill the sending account because of minimum thresold reached.  
+
+Queries:
+- account(AccountId)-> AccountData - Get the balance of an account.  
+- locks(AccountId)-> Vec<BalanceLock> - Any liquidity locks on the signing account balances.  
+- totalissuance -> Balance - The total amount issued in the blockchain.  
+
+
+
+
+
+
+
+
+
+
+

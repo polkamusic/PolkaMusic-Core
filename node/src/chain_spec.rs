@@ -9,7 +9,7 @@ use sp_runtime::traits::{Verify, IdentifyAccount};
 use sc_service::ChainType;
 
 // The URL for the telemetry server.
-// const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
+// const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkmusic.io/submit/";
 
 /// Specialized `ChainSpec`. This is a specialization of the general Substrate ChainSpec type.
 pub type ChainSpec = sc_service::GenericChainSpec<GenesisConfig>;
@@ -22,7 +22,6 @@ pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Pu
 }
 
 type AccountPublic = <Signature as Verify>::Signer;
-
 /// Generate an account ID from seed.
 pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId where
 	AccountPublic: From<<TPublic::Pair as Pair>::Public>

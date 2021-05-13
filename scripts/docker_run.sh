@@ -2,7 +2,7 @@
 
 set -e
 
-echo "*** Start Substrate node template ***"
+echo "*** Start PolkaMusic Node ***"
 
 cd $(dirname ${BASH_SOURCE[0]})/..
 

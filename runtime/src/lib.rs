@@ -107,7 +107,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 /// up by `pallet_aura` to implement `fn slot_duration()`.
 ///
 /// Change this to adjust the block time.
-pub const MILLISECS_PER_BLOCK: u64 = 6000;
+pub const MILLISECS_PER_BLOCK: u64 = 6000; //6 seconds
 
 pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
 
@@ -244,21 +244,21 @@ impl pallet_balances::Config for Runtime {
 parameter_types! {
 	pub const TransactionByteFee: Balance = 1;
 }
-
+// pallet to compute the expected gas fees, used before executing transactions.
 impl pallet_transaction_payment::Config for Runtime {
 	type OnChargeTransaction = CurrencyAdapter<Balances, ()>;
 	type TransactionByteFee = TransactionByteFee;
 	type WeightToFee = IdentityFee<Balance>;
 	type FeeMultiplierUpdate = ();
 }
-
+// Super user module (SUDO)
 impl pallet_sudo::Config for Runtime {
 	type Event = Event;
 	type Call = Call;
 }
 
 
-// Create the runtime by composing the FRAME pallets that were previously configured.
+// Create the runtime with the used pallets.
 construct_runtime!(
 	pub enum Runtime where
 		Block = Block,
@@ -270,10 +270,10 @@ construct_runtime!(
 		Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
 		Aura: pallet_aura::{Module, Config<T>},
 		Grandpa: pallet_grandpa::{Module, Call, Storage, Config, Event},
-		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
-		
+		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
+
 	}
 );
 
