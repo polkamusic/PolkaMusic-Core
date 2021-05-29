@@ -38,7 +38,8 @@ pub use frame_support::{
 	},
 };
 use pallet_transaction_payment::CurrencyAdapter;
-
+/// Import the Contract Right Management pallet.
+pub use pallet_crm;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -256,6 +257,10 @@ impl pallet_sudo::Config for Runtime {
 	type Event = Event;
 	type Call = Call;
 }
+// Contract Right Management Contract
+impl pallet_crm::Config for Runtime {
+	type Event = Event;
+}
 
 
 // Create the runtime with the used pallets.
@@ -273,7 +278,7 @@ construct_runtime!(
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
-
+		Crm: pallet_crm::{Module, Call, Storage, Event<T>},
 	}
 );
 

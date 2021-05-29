@@ -84,7 +84,7 @@ Command to purge the development chain's state:
 - This chain uses ```substrate``` v3.0.0
 
 ## Web Interface
-A web interface for developers is available at this url:  [https://ipfs.io/ipns/dotapps.io](https://ipfs.io/ipns/dotapps.io)  
+A web interface for developers is available at this url:  [https://polkadot.js.org/apps](https://polkadot.js.org/apps)  
 You should select your node address, for example ws://127.0.0.1:9944 
 
 ## Functions Available:
@@ -122,6 +122,8 @@ Queries:
 - account(AccountId)-> AccountData - Get the balance of an account.  
 - locks(AccountId)-> Vec<BalanceLock> - Any liquidity locks on the signing account balances.  
 - totalissuance -> Balance - The total amount issued in the blockchain.  
+
+
 
 
 

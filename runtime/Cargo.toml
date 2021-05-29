@@ -25,6 +25,7 @@ hex-literal = { optional = true, version = '0.3.1' }
 serde = { features = ['derive'], optional = true, version = '1.0.119' }
 
 # local dependencies
+pallet-crm ={ default-features = false, version = '0.1.0', path = "../pallets/crm" }
 
 # Substrate dependencies
 frame-benchmarking = { default-features = false, optional = true, version = '3.0.0' }
