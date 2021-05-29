@@ -25,17 +25,28 @@ pub trait Config: frame_system::Config {
 // The runtime storage items
 
 decl_storage! {
-	trait Store for Module<T: Config> as CrmPolkaMusic {
-		// the Contracts data in json format, keys are the account creator and unique id
+	trait Store for Module<T: Config> as PolkaMusic {
+		// the Contract main data in json format, keys are the account creator and unique id
 		CrmData get(fn get_crmdata): double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) u32 => Option<Vec<u8>>;
+		// the Contract Master data in json format, keys are the account creator and unique id
+		CrmMasterData get(fn get_master): double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) u32 => Option<Vec<u8>>;
+		// the Contract composition data in json format, keys are the account creator and unique id
+		CrmCompositionData get(fn get_composition): double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) u32 => Option<Vec<u8>>;
+		// the Contract, Other Contracts data in json format, keys are the account creator and unique id
+		CrmOtherContractsData get(fn get_othercontracts): double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) u32 => Option<Vec<u8>>;
 	}
 }
 
 // Events used to inform users when important changes are made.
 decl_event!(
 	pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId {
-		CrmAdded(AccountId, u32),
-		CrmChanged(AccountId, u32),
+		CrmAdded(AccountId, u32),					// New contract has been added
+		CrmDataChangeProposal(AccountId, u32),		// A proposal change has been submitted
+		CrmChangeVote(AccountId, u32),		    	// A vote to a change proposal has been received
+		CrmDataChanged(AccountId, u32),				// Crm data has been changed
+		CrmMasterChanged(AccountId, u32),	    	// Crm master data has been changed
+		CrmCompositionChanged(AccountId, u32),		// Crm composition data has been changed
+		CrmOtherContractsChanged(AccountId,Vec<u8>),// Crm other contracts data has been changed
 	}
 );
 
@@ -45,10 +56,20 @@ decl_error! {
 	pub enum Error for Module<T: Config> {
 		/// Missing value
 		NoneValue,
-		/// Value is too short to be valid
-		TooShort,
-		/// Value is too long to be valid
-		TooLong,
+		/// CrmData is too short to be valid
+		CrmDataTooShort,
+		/// CrmData is too long to be valid
+		CrmDataTooLong,
+		/// Master Data is too short to be valid
+		MasterTooShort,
+		/// Master data is too long to be valid
+		MasterTooLong,
+		/// Composition Data is too short to be valid
+		CompositionTooShort,
+		/// Composition data is too long to be valid
+		CompositionTooLong,
+		/// Other Contracts data is too long to be valid
+		OtherContractsTooLong,
 		/// Value is not valid
 		InvalidValue,
 		/// Invalid Json Structure
@@ -77,6 +98,10 @@ decl_error! {
 		InvalidCrowdFundingshares,
 		/// Invalid Total Share, must be = 100
 		InvalidTotalShares,
+		/// Invalid ContractId that should be accountId+ u32
+		InvalidContractId,
+		/// Missing Contract data to change
+		MissingContractData,
 	}
 }
 
@@ -90,6 +115,7 @@ decl_module! {
 
 		// Events must be initialized if they are used by the pallet.
 		fn deposit_event() = default;
+
 		// function to create a new Contract Rights Management (CRM), the crmid must be not already used and in the crmdata a json structure is expected with the following fields:
 		/*
 		{
@@ -108,13 +134,21 @@ decl_module! {
 		for example:
 		{"ipfshash":"0E7071C59DF3B9454D1D18A15270AA36D54F89606A576DC621757AFD44AD1D2E","ipfshashprivate": "B45165ED3CD437B9FFAD02A2AAD22A4DDC69162470E2622982889CE5826F6E3D","globalquorum":100,"mastershare":50,"masterquorum":51,"compositionshare":30,"compositionquorum":51,"othercontractsshare":20,"othercontractsquorum":51}
 		*/
-		#[weight = 10_000]
-		pub fn new_crmdata(origin, crmid: u32, crmdata: Vec<u8>) -> dispatch::DispatchResult {
+		#[weight = 50_000]
+		pub fn new_contract(origin, crmid: u32, crmdata: Vec<u8>,master: Vec<u8>,composition:Vec<u8>,othercontracts: Vec<u8>) -> dispatch::DispatchResult {
 			// Check that the extrinsic was signed and get the signer.
 			let sender = ensure_signed(origin)?;
 			// check crm data
-			ensure!(crmdata.len() >= 8, Error::<T>::TooShort); //check minimum length
-			ensure!(crmdata.len() <= 8192, Error::<T>::TooLong);  // check maximum length
+			ensure!(crmdata.len() >= 32, Error::<T>::CrmDataTooShort); //check minimum length
+			ensure!(crmdata.len() <= 1024, Error::<T>::CrmDataTooLong);  // check maximum length
+			// check master data
+			ensure!(master.len() >= 8, Error::<T>::MasterTooShort); //check minimum length
+			ensure!(master.len() <= 1024, Error::<T>::MasterTooLong);  // check maximum length
+			// check composition data
+			ensure!(composition.len() >= 8, Error::<T>::CompositionTooShort); //check minimum length
+			ensure!(composition.len() <= 1024, Error::<T>::CompositionTooLong);  // check maximum length
+			// check Other Contracts data
+			ensure!(othercontracts.len() <= 1024, Error::<T>::OtherContractsTooLong);  // check maximum length
 			// check oracleid
 			ensure!(crmid > 0, Error::<T>::InvalidValue); //check for oracleid >0
             // check of the account id/oracle is free
@@ -251,19 +285,53 @@ decl_module! {
 			// check that the total shares are = 100 
 			let totalshares=mastersharevalue+compositionsharevalue+othercontractssharevalue+crodwfundingsharevalue;
 			ensure!(totalshares == 100, Error::<T>::InvalidTotalShares); //check total shares that must be 100
-
-			// Update storage.
+			// Write storage for crmdata
 			let crmstorage=crmdata.clone();
 			let crmidstorage=crmid.clone();
 			<CrmData<T>>::insert(&sender, crmidstorage, crmstorage);
+			// Write storage for master data
+			let masterstorage=master.clone();
+			let masteridstorage=crmid.clone();
+			<CrmMasterData<T>>::insert(&sender, masteridstorage, masterstorage);
+			// Write storage for Composition data
+			let compositionstorage=composition.clone();
+			let compositionidstorage=crmid.clone();
+			<CrmCompositionData<T>>::insert(&sender, compositionidstorage, compositionstorage);
+			// write storage for Other Contracts data (optional)
+			if othercontracts.len()>0{
+				// Update storage for Other Contracts data
+				let othercontractsstorage=othercontracts.clone();
+				let othercontractsidstorage=crmid.clone();
+				<CrmOtherContractsData<T>>::insert(&sender, othercontractsidstorage, othercontractsstorage);
+			}
 			// Emit an event
 			Self::deposit_event(RawEvent::CrmAdded(sender,crmid));
 			// Return a successful DispatchResult
 			Ok(())
 		}
+		
+		// function to submit a change proposal that must be approved by the quorum initially set
+		#[weight = 50_000]
+		pub change_proposal_crmdata(origin, contractid: Vec<u8>, crmdata: Vec<u8>) -> dispatch::DispatchResult {
+			// Check that the extrinsic is signed and get the signer.
+			let sender = ensure_signed(origin)?;
+			// check contractid
+			ensure!(contractid.len() >= 33, Error::<T>::ContractIdTooShort); //check minimum length
+			ensure!(contractid.len() <= 128, Error::<T>::ContractIdTooLong); //check maximum length
+			// check that at the least some data to change has been received and it's not too long
+			ensure!(crmdata.len()>0, Error::<T>::<MissingContractData>); 
+			ensure!(crmdata.len()<1024, Error::<T>::<CrmDataTooLong>); 
+			// search the contractid in the storage
+			// check the sender is part of the data submitted
+			// store the proposal
+			// Emit an event
+			Self::deposit_event(RawEvent::CrmDataChangeProposal(sender,contractid));
+			// Return a successful DispatchResult
+			Ok(())
+		}
 	}
 }
-// function to validate a json string
+// function to validate a json string for no/std. It does not allocate of memory
 fn json_check_validity(j:Vec<u8>) -> bool{	
     // minimum lenght of 2
     if j.len()<2 {
