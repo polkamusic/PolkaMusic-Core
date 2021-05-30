@@ -2,12 +2,23 @@
 
 /// CRM - Module to setup the contracts for rights management
 
-use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch, ensure};
+use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch, ensure,codec::{Decode, Encode}};
 use frame_system::ensure_signed;
 use sp_std::prelude::*;
 use core::str;
 use core::str::FromStr;
 
+// structure to keep the voting results of the change proposal
+#[derive(Encode, Decode, Default, Clone, PartialEq)]
+pub struct Voting {
+	changeid: u32,
+	crmid: u32,
+	quorum: u32,
+	nrvotesyes: u32,
+	nrvotesno: u32,
+	percvotesyes: u32,
+	percvotesno:u32,
+}
 
 #[cfg(test)]
 mod mock;
@@ -35,6 +46,7 @@ decl_storage! {
 		CrmOtherContractsData get(fn get_othercontracts): map hasher(blake2_128_concat) u32 => Option<Vec<u8>>;
 		// Change proposal queue for Crm Data
 		CrmDataChangeProposal get(fn get_crmdata_change_proposal): double_map hasher(blake2_128_concat) u32, hasher(blake2_128_concat) u32 => Option<Vec<u8>>;
+		CrmDataChangeVoting get(fn get_crmdata_change_voting): double_map hasher(blake2_128_concat) u32, hasher(blake2_128_concat) u32 => Option<Voting>;
 	}
 }
 
@@ -140,7 +152,7 @@ decl_module! {
 		// Events must be initialized if they are used by the pallet.
 		fn deposit_event() = default;
 		
-		// function to create a new Contract Rights Management (CRM), the crmid must be not already used and in the crmdata a json structure is expected with the following fields:
+		// function to create a new Contract Rights Management (CRM), the crmid must be not already used json structures are expected. For crmdata:
 		/*
 		{
 			"ipfshash": "xxxxxx"            				// ipfs hash of the metadata (one hash is usable for whole folder of files)
@@ -498,7 +510,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "0"
             };
-            let globalquorumvalue:u64 = match u64::from_str(globalquorum_str){
+            let globalquorumvalue:u32 = match u32::from_str(globalquorum_str){
                 Ok(f) => f,
                 Err(_) => 0,
             };
@@ -512,7 +524,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "0"
             };
-            let mastersharevalue:u64 = match u64::from_str(mastershare_str){
+            let mastersharevalue:u32 = match u32::from_str(mastershare_str){
                 Ok(f) => f,
                 Err(_) => 0,
             };
@@ -526,7 +538,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "0"
             };
-            let masterquorumvalue:u64 = match u64::from_str(masterquorum_str){
+            let masterquorumvalue:u32 = match u32::from_str(masterquorum_str){
                 Ok(f) => f,
                 Err(_) => 0,
             };
@@ -540,7 +552,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "0"
             };
-            let compositionsharevalue:u64 = match u64::from_str(compositionshare_str){
+            let compositionsharevalue:u32 = match u32::from_str(compositionshare_str){
                 Ok(f) => f,
                 Err(_) => 0,
             };
@@ -554,7 +566,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "0"
             };
-            let compositionquorumvalue:u64 = match u64::from_str(compositionquorum_str){
+            let compositionquorumvalue:u32 = match u32::from_str(compositionquorum_str){
                 Ok(f) => f,
                 Err(_) => 0,
             };
@@ -568,7 +580,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "100"
             };
-            let othercontractssharevalue:u64 = match u64::from_str(othercontractsshare_str){
+            let othercontractssharevalue:u32 = match u32::from_str(othercontractsshare_str){
                 Ok(f) => f,
                 Err(_) => 100,
             };
@@ -581,7 +593,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "100"
             };
-            let othercontractsquorumvalue:u64 = match u64::from_str(othercontractsquorum_str){
+            let othercontractsquorumvalue:u32 = match u32::from_str(othercontractsquorum_str){
                 Ok(f) => f,
                 Err(_) => 100,
             };
@@ -594,7 +606,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "0"
             };
-            let crodwfundingsharevalue:u64 = match u64::from_str(crodwfundingshare_str){
+            let crodwfundingsharevalue:u32 = match u32::from_str(crodwfundingshare_str){
                 Ok(f) => f,
                 Err(_) => 0,
             };
@@ -604,6 +616,17 @@ decl_module! {
 			ensure!(totalshares == 100, Error::<T>::InvalidTotalShares); //check total shares that must be 100			
 			// store the proposal data in the queue.
 			CrmDataChangeProposal::insert(crmid.clone(),changeid.clone(), crmdata.clone());
+			// store initial voting results
+			let v= Voting {
+				changeid: changeid.clone(),
+				crmid: crmid.clone(),
+				quorum: globalquorumvalue,
+				nrvotesyes: 0,
+				nrvotesno: 0,
+				percvotesyes: 0,
+				percvotesno: 0,
+			};
+			CrmDataChangeVoting::insert(crmid.clone(),changeid.clone(),v);
 			// Emit an event
 			Self::deposit_event(RawEvent::CrmDataNewChangeProposal(sender,crmid));
 			Ok(())
