@@ -97,7 +97,7 @@ decl_error! {
 		InvalidCrowdFundingshares,
 		/// Invalid Total Share, must be = 100
 		InvalidTotalShares,
-		/// Invalid ContractId that should be accountId+ u32
+		/// Invalid ContractId 
 		InvalidContractId,
 		/// Missing Contract data to change
 		MissingContractData,
@@ -400,6 +400,18 @@ decl_module! {
 					// check for nickname
 					let id=json_get_value(jr.clone(),"id".as_bytes().to_vec());
 					ensure!(id.len() >0, Error::<T>::MissingOtherContractsId); 
+					// convert id from vec to u32
+					let id_slice=id.as_slice();
+            		let id_str=match str::from_utf8(&id_slice){
+                		Ok(f) => f,
+                		Err(_) => "0"
+            		};
+            		let idvalue:u32 = match u32::from_str(id_str){
+                		Ok(f) => f,
+                		Err(_) => 0,
+            		};
+					// check that the id is on chain
+					ensure!(CrmData::contains_key(&idvalue)==true, Error::<T>::InvalidContractId);					
 					// check for percentage
 					let percentage=json_get_value(jr.clone(),"percentage".as_bytes().to_vec());
 					ensure!(percentage.len() >0, Error::<T>::MissingCompositionPercentage);
