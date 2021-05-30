@@ -101,8 +101,16 @@ decl_error! {
 		InvalidContractId,
 		/// Missing Contract data to change
 		MissingContractData,
-		// Contract ID is too short
+		/// Contract ID is too short
 		ContractIdTooShort,
+		/// Missing Nick name in Master data record
+		MissingMasterNickname,
+		/// Missing Account id in Master data record
+		MissingMasterAccount,
+		/// Missing percentage in Master data record
+		MissingMasterPercentage,
+		/// Wrong Total Percentage Master
+		WrongTotalPercentageMaster,
 	}
 }
 
@@ -132,7 +140,15 @@ decl_module! {
 			"crowdfounders": "xxxxxx"					    // crowd funding campaign Id
 		}
 		for example:
+		cmmrid can be: 3
+		crmdata can be:
 		{"ipfshash":"0E7071C59DF3B9454D1D18A15270AA36D54F89606A576DC621757AFD44AD1D2E","ipfshashprivate": "B45165ED3CD437B9FFAD02A2AAD22A4DDC69162470E2622982889CE5826F6E3D","globalquorum":100,"mastershare":50,"masterquorum":51,"compositionshare":30,"compositionquorum":51,"othercontractsshare":20,"othercontractsquorum":51}
+		master can be:
+		{"master": [{"nickname": "Bob","account": "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty","percentage": 50},{"nickname": "Bob Stash","account": "5HpG9w8EBLe5XCrbczpwq5TSXvedjrBGCwqxK1iQ7qUsSWFc","percentage": 50}]}
+		composition can be:
+		{"composition": [{"nickname": "Charlie","account": "5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y","percentage": 50},{"nickname": "Dave","account": "5DAAnrj7VHTznn2AWBemMuyBwZWs6FNFjdyVXUeYum3PTXFy","percentage": 50}]}
+		Other Contracts shares can be (contracts id must exist on chain):
+		{"othercontracts": [{"id": 1,"percentage": 50},{"id": 2,"percentage": 50}]}
 		*/
 		#[weight = 50_000]
 		pub fn new_contract(origin, crmid: u32, crmdata: Vec<u8>,master: Vec<u8>,composition:Vec<u8>,othercontracts: Vec<u8>) -> dispatch::DispatchResult {
@@ -277,19 +293,61 @@ decl_module! {
 			// check that the total shares are = 100 
 			let totalshares=mastersharevalue+compositionsharevalue+othercontractssharevalue+crodwfundingsharevalue;
 			ensure!(totalshares == 100, Error::<T>::InvalidTotalShares); //check total shares that must be 100
+			// check validity of master data
+			let masterclone=master.clone();
+			// check for a valid json
+			ensure!(json_check_validity(masterclone),Error::<T>::InvalidJson);
+			let mut x=0;
+			let mut totpercentage:u32 = 0;
+			// check validity of records for Master Data
+			loop {
+				let jr=json_get_recordvalue(master.clone(),x);
+				if jr.len()==0 {
+					break;
+				}
+				// check for nickname
+				let nickname=json_get_value(jr.clone(),"nickname".as_bytes().to_vec());
+				ensure!(nickname.len() >0, Error::<T>::MissingMasterNickname); 
+				// check for account address
+				let account=json_get_value(jr.clone(),"account".as_bytes().to_vec());
+				ensure!(account.len() >0, Error::<T>::MissingMasterAccount);
+				// check for percentage
+				let percentage=json_get_value(jr.clone(),"percentage".as_bytes().to_vec());
+				ensure!(percentage.len() >0, Error::<T>::MissingMasterPercentage);
+				// convert percentage from vec to u32
+				let percentage_slice=percentage.as_slice();
+            	let percentage_str=match str::from_utf8(&percentage_slice){
+                	Ok(f) => f,
+                	Err(_) => "0"
+            	};
+            	let percentagevalue:u32 = match u32::from_str(percentage_str){
+                	Ok(f) => f,
+                	Err(_) => 0,
+            	};
+				// sum percentage to totpercentage
+				totpercentage=totpercentage+percentagevalue;
+				x=x+1;
+			}
+			// check the total percentage is = 100
+			ensure!(totpercentage == 100, Error::<T>::WrongTotalPercentageMaster); 
+
+
+			//****************************************
+			// STORING DATA 
+			//****************************************
 			// Write storage for crmdata
 			let crmstorage=crmdata.clone();
 			let crmidstorage=crmid.clone();
 			CrmData::insert(&crmidstorage, crmstorage);
-			// Write storage for master data
+			// Write the storage for master data
 			let masterstorage=master.clone();
 			let masteridstorage=crmid.clone();
 			CrmMasterData::insert(masteridstorage, masterstorage);
-			// Write storage for Composition data
+			// Write the storage for Composition data
 			let compositionstorage=composition.clone();
 			let compositionidstorage=crmid.clone();
 			CrmCompositionData::insert(compositionidstorage, compositionstorage);
-			// write storage for Other Contracts data (optional)
+			// write the storage for Other Contracts data (optional)
 			if othercontracts.len()>0 {
 				// Update storage for Other Contracts data
 				let othercontractsstorage=othercontracts.clone();
@@ -402,6 +460,38 @@ fn json_check_validity(j:Vec<u8>) -> bool{
     // every ok returns true
     return true;
 }
+// function to get record {} from multirecord json structure [{..},{.. }], it returns an empty Vec when the records is not present
+fn json_get_recordvalue(ar:Vec<u8>,p:i32) -> Vec<u8> {
+    let mut result=Vec::new();
+    let mut op=true;
+    let mut cn=0;
+    let mut lb=b' ';
+    for b in ar {
+        if b==b',' && op==true {
+            cn=cn+1;
+            continue;
+        }
+        if b==b'[' && op==true && lb!=b'\\' {
+            continue;
+        }
+        if b==b']' && op==true && lb!=b'\\' {
+            continue;
+        }
+        if b==b'{' && op==true && lb!=b'\\' { 
+            op=false;
+        }
+        if b==b'}' && op==false && lb!=b'\\' {
+            op=true;
+        }
+        // field found
+        if cn==p {
+            result.push(b);
+        }
+        lb=b.clone();
+    }
+    return result;
+}
+
 // function to get value of a field for Substrate runtime (no std library and no variable allocation)
 fn json_get_value(j:Vec<u8>,key:Vec<u8>) -> Vec<u8> {
     let mut result=Vec::new();
