@@ -33,6 +33,8 @@ decl_storage! {
 		CrmCompositionData get(fn get_composition): map hasher(blake2_128_concat) u32 => Option<Vec<u8>>;
 		// the Contract, Other Contracts data in json format, the key is the uniqueid received
 		CrmOtherContractsData get(fn get_othercontracts): map hasher(blake2_128_concat) u32 => Option<Vec<u8>>;
+		// Change proposal queue for Crm Data
+		CrmDataChangeProposal get(fn get_crmdata_change_proposal): double_map hasher(blake2_128_concat) u32, hasher(blake2_128_concat) u32 => Option<Vec<u8>>;
 	}
 }
 
@@ -40,7 +42,7 @@ decl_storage! {
 decl_event!(
 	pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId {
 		CrmAdded(AccountId, u32),					// New contract has been added
-		CrmDataChangeProposal(AccountId, Vec<u8>),		// A proposal change has been submitted
+		CrmDataNewChangeProposal(AccountId, u32),	// A proposal change has been submitted
 		CrmChangeVote(AccountId, u32),		    	// A vote to a change proposal has been received
 		CrmDataChanged(AccountId, u32),				// Crm data has been changed
 		CrmMasterChanged(AccountId, u32),	    	// Crm master data has been changed
@@ -123,6 +125,8 @@ decl_error! {
 		MissingOtherContractsId,
 		/// Wrong Total Percentage Other Contracts
 		WrongTotalPercentageOtherContracts,
+		/// Changed Proposal Id is already present on chain
+		ChangeIdDuplicated,
 	}
 }
 
@@ -460,26 +464,153 @@ decl_module! {
 			// Return a successful DispatchResult
 			Ok(())
 		}
-		/// Submit a change proposal that must be approved by the quorum 
+
+		/// Submit a change proposal for CRM data that must be approved by the quorum 
 		#[weight = 50_000]
-		pub fn change_proposal_crmdata(origin, crmid: Vec<u8>, crmdata: Vec<u8>) -> dispatch::DispatchResult {
+		pub fn change_proposal_crmdata(origin, changeid: u32, crmid: u32, crmdata: Vec<u8>) -> dispatch::DispatchResult {
 			// Check that the extrinsic is signed and get the signer.
 			let sender = ensure_signed(origin)?;
 			// check contractid
-			ensure!(crmid.len() > 1, Error::<T>::ContractIdTooShort); //check minimum length
+			ensure!(crmid > 1, Error::<T>::ContractIdTooShort); //check minimum length
 			// check that at the least some data to change has been received and it's not too long
 			ensure!(crmdata.len()>0, Error::<T>::MissingContractData); 
 			ensure!(crmdata.len()<1024, Error::<T>::CrmDataTooLong); 
-			//ensure!(<CrmData<T>>::contains_key(&sender_str,crmid)==true, Error::<T>::ContractIdNotFound);
-			// check the sender is part of the data submitted
-			// store the proposal
+			// check the contract id is on chain
+			ensure!(CrmData::contains_key(&crmid)==true, Error::<T>::InvalidContractId);	
+			// check the changeid  is NOT on chain
+			ensure!(CrmDataChangeProposal::contains_key(crmid.clone(),changeid.clone())==false, Error::<T>::ChangeIdDuplicated);	
+			// check the validity of the proposed CRM data	
+			let js=crmdata.clone();
+			ensure!(json_check_validity(js),Error::<T>::InvalidJson);
+			// check ipfshash
+			let jsf=crmdata.clone();
+			let ipfshash=json_get_value(jsf,"ipfshash".as_bytes().to_vec());
+			ensure!(ipfshash.len() >= 4, Error::<T>::InvalidIpfsHash); //check minimum length for the Ipfs Hash
+			// check ipfshash private
+			let jsfp=crmdata.clone();
+			let ipfshashprivate=json_get_value(jsfp,"ipfshashprivate".as_bytes().to_vec());
+			ensure!(ipfshashprivate.len() >= 4, Error::<T>::InvalidIpfsHashPrivate); //check minimum length for the Ipfs Hash Private
+			// check globalquorum
+			let jsgq=crmdata.clone();
+			let globalquorum=json_get_value(jsgq,"globalquorum".as_bytes().to_vec());
+			let globalquorum_slice=globalquorum.as_slice();
+            let globalquorum_str=match str::from_utf8(&globalquorum_slice){
+                Ok(f) => f,
+                Err(_) => "0"
+            };
+            let globalquorumvalue:u64 = match u64::from_str(globalquorum_str){
+                Ok(f) => f,
+                Err(_) => 0,
+            };
+			ensure!(globalquorumvalue > 0, Error::<T>::InvalidGlobalQuorum); //check Global Quorum that must be > 0
+			ensure!(globalquorumvalue <= 100, Error::<T>::InvalidGlobalQuorum); //check Global Quorum that must be <=100
+			// check master shares
+			let jsms=crmdata.clone();
+			let mastershare=json_get_value(jsms,"mastershare".as_bytes().to_vec());
+			let mastershare_slice=mastershare.as_slice();
+            let mastershare_str=match str::from_utf8(&mastershare_slice){
+                Ok(f) => f,
+                Err(_) => "0"
+            };
+            let mastersharevalue:u64 = match u64::from_str(mastershare_str){
+                Ok(f) => f,
+                Err(_) => 0,
+            };
+			ensure!(mastersharevalue > 0, Error::<T>::InvalidMasterShare); //check Master Shares  that must be > 0
+			ensure!(mastersharevalue <= 100, Error::<T>::InvalidMasterShare); //check Master Shares that must be <=100
+			// check master quorum
+			let jsmq=crmdata.clone();
+			let masterquorum=json_get_value(jsmq,"masterquorum".as_bytes().to_vec());
+			let masterquorum_slice=masterquorum.as_slice();
+            let masterquorum_str=match str::from_utf8(&masterquorum_slice){
+                Ok(f) => f,
+                Err(_) => "0"
+            };
+            let masterquorumvalue:u64 = match u64::from_str(masterquorum_str){
+                Ok(f) => f,
+                Err(_) => 0,
+            };
+			ensure!(masterquorumvalue > 0, Error::<T>::InvalidMasterQuorum); //check Master Quorum that must be > 0
+			ensure!(masterquorumvalue <= 100, Error::<T>::InvalidMasterQuorum); //check Master Quorum that must be <=100
+			// check composition shares
+			let jscs=crmdata.clone();
+			let compositionshare=json_get_value(jscs,"compositionshare".as_bytes().to_vec());
+			let compositionshare_slice=compositionshare.as_slice();
+            let compositionshare_str=match str::from_utf8(&compositionshare_slice){
+                Ok(f) => f,
+                Err(_) => "0"
+            };
+            let compositionsharevalue:u64 = match u64::from_str(compositionshare_str){
+                Ok(f) => f,
+                Err(_) => 0,
+            };
+			ensure!(compositionsharevalue > 0, Error::<T>::InvalidCompositionShare); //check Composition Shares  that must be > 0
+			ensure!(compositionsharevalue <= 100, Error::<T>::InvalidCompositionShare); //check Composition Shares that must be <=100
+			// check composition quorum
+			let jscq=crmdata.clone();
+			let compositionquorum=json_get_value(jscq,"compositionquorum".as_bytes().to_vec());
+			let compositionquorum_slice=compositionquorum.as_slice();
+            let compositionquorum_str=match str::from_utf8(&compositionquorum_slice){
+                Ok(f) => f,
+                Err(_) => "0"
+            };
+            let compositionquorumvalue:u64 = match u64::from_str(compositionquorum_str){
+                Ok(f) => f,
+                Err(_) => 0,
+            };
+			ensure!(compositionquorumvalue > 0, Error::<T>::InvalidCompositionQuorum); //check Composition Quorum  that must be > 0
+			ensure!(compositionquorumvalue <= 100, Error::<T>::InvalidCompositionQuorum); //check Composition Quorum that must be <=100
+			// check othercontracts shares
+			let jsos=crmdata.clone();
+			let othercontractsshare=json_get_value(jsos,"othercontractsshare".as_bytes().to_vec());
+			let othercontractsshare_slice=othercontractsshare.as_slice();
+            let othercontractsshare_str=match str::from_utf8(&othercontractsshare_slice){
+                Ok(f) => f,
+                Err(_) => "100"
+            };
+            let othercontractssharevalue:u64 = match u64::from_str(othercontractsshare_str){
+                Ok(f) => f,
+                Err(_) => 100,
+            };
+			ensure!(othercontractssharevalue <= 100, Error::<T>::InvalidOtherContractsShare); 	//check Composition Shares that must be <=100
+			// check other contracts quorum
+			let jsoq=crmdata.clone();
+			let othercontractsquorum=json_get_value(jsoq,"othercontractsquorum".as_bytes().to_vec());
+			let othercontractsquorum_slice=othercontractsquorum.as_slice();
+            let othercontractsquorum_str=match str::from_utf8(&othercontractsquorum_slice){
+                Ok(f) => f,
+                Err(_) => "100"
+            };
+            let othercontractsquorumvalue:u64 = match u64::from_str(othercontractsquorum_str){
+                Ok(f) => f,
+                Err(_) => 100,
+            };
+			ensure!(othercontractsquorumvalue <= 100, Error::<T>::InvalidOtherContractsQuorum); //check other Contracts Quorum that must be <=100
+			// check crowdfundingshare
+			let jscf=crmdata.clone();
+			let crodwfundingshare=json_get_value(jscf,"crodwfundingshares".as_bytes().to_vec());
+			let crodwfundingshare_slice=crodwfundingshare.as_slice();
+            let crodwfundingshare_str=match str::from_utf8(&crodwfundingshare_slice){
+                Ok(f) => f,
+                Err(_) => "0"
+            };
+            let crodwfundingsharevalue:u64 = match u64::from_str(crodwfundingshare_str){
+                Ok(f) => f,
+                Err(_) => 0,
+            };
+			ensure!(crodwfundingsharevalue <= 100, Error::<T>::InvalidCrowdFundingshares); //check Crowd Funding Shares that must be <=100
+			// check that the total shares are = 100 
+			let totalshares=mastersharevalue+compositionsharevalue+othercontractssharevalue+crodwfundingsharevalue;
+			ensure!(totalshares == 100, Error::<T>::InvalidTotalShares); //check total shares that must be 100			
+			// store the proposal data in the queue.
+			CrmDataChangeProposal::insert(crmid.clone(),changeid.clone(), crmdata.clone());
 			// Emit an event
-			Self::deposit_event(RawEvent::CrmDataChangeProposal(sender,crmid));
+			Self::deposit_event(RawEvent::CrmDataNewChangeProposal(sender,crmid));
 			Ok(())
 		}
-
 	}
 }
+
 // function to validate a json string for no/std. It does not allocate of memory
 fn json_check_validity(j:Vec<u8>) -> bool{	
     // minimum lenght of 2
