@@ -2,8 +2,7 @@
 
 /// CRM - Module to setup the contracts for rights management
 
-use frame_support::{
-    decl_module, decl_storage, decl_event, decl_error, dispatch, ensure};
+use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch, ensure};
 use frame_system::ensure_signed;
 use sp_std::prelude::*;
 use core::str;
@@ -26,14 +25,14 @@ pub trait Config: frame_system::Config {
 
 decl_storage! {
 	trait Store for Module<T: Config> as PolkaMusic {
-		// the Contract main data in json format, keys are the account creator and unique id
-		CrmData get(fn get_crmdata): double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) u32 => Option<Vec<u8>>;
-		// the Contract Master data in json format, keys are the account creator and unique id
-		CrmMasterData get(fn get_master): double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) u32 => Option<Vec<u8>>;
-		// the Contract composition data in json format, keys are the account creator and unique id
-		CrmCompositionData get(fn get_composition): double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) u32 => Option<Vec<u8>>;
-		// the Contract, Other Contracts data in json format, keys are the account creator and unique id
-		CrmOtherContractsData get(fn get_othercontracts): double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) u32 => Option<Vec<u8>>;
+		// the Contract main data in json format, the key is the uniqueid received
+		CrmData get(fn get_crmdata): map hasher(blake2_128_concat) u32 => Option<Vec<u8>>;
+		// the Contract Master data in json format, the key is the uniqueid received
+		CrmMasterData get(fn get_master): map hasher(blake2_128_concat) u32 => Option<Vec<u8>>;
+		// the Contract composition data in json format, the key is the uniqueid received
+		CrmCompositionData get(fn get_composition): map hasher(blake2_128_concat) u32 => Option<Vec<u8>>;
+		// the Contract, Other Contracts data in json format, the key is the uniqueid received
+		CrmOtherContractsData get(fn get_othercontracts): map hasher(blake2_128_concat) u32 => Option<Vec<u8>>;
 	}
 }
 
@@ -41,7 +40,7 @@ decl_storage! {
 decl_event!(
 	pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId {
 		CrmAdded(AccountId, u32),					// New contract has been added
-		CrmDataChangeProposal(AccountId, u32),		// A proposal change has been submitted
+		CrmDataChangeProposal(AccountId, Vec<u8>),		// A proposal change has been submitted
 		CrmChangeVote(AccountId, u32),		    	// A vote to a change proposal has been received
 		CrmDataChanged(AccountId, u32),				// Crm data has been changed
 		CrmMasterChanged(AccountId, u32),	    	// Crm master data has been changed
@@ -102,6 +101,8 @@ decl_error! {
 		InvalidContractId,
 		/// Missing Contract data to change
 		MissingContractData,
+		// Contract ID is too short
+		ContractIdTooShort,
 	}
 }
 
@@ -112,10 +113,9 @@ decl_module! {
 	pub struct Module<T: Config> for enum Call where origin: T::Origin {
 		// Errors must be initialized
 		type Error = Error<T>;
-
 		// Events must be initialized if they are used by the pallet.
 		fn deposit_event() = default;
-
+		
 		// function to create a new Contract Rights Management (CRM), the crmid must be not already used and in the crmdata a json structure is expected with the following fields:
 		/*
 		{
@@ -150,17 +150,9 @@ decl_module! {
 			// check Other Contracts data
 			ensure!(othercontracts.len() <= 1024, Error::<T>::OtherContractsTooLong);  // check maximum length
 			// check oracleid
-			ensure!(crmid > 0, Error::<T>::InvalidValue); //check for oracleid >0
-            // check of the account id/oracle is free
-            match <CrmData<T>>::get(&sender,&crmid){
-                // crm id is already existing
-                Some(_) => {
-                    return Err(Error::<T>::DuplicatedCrmId.into());
-                }
-                // Crm id is not yet used
-                None => { //nothing to do, we move on
-                }
-            }
+			ensure!(crmid > 0, Error::<T>::InvalidValue); //check for crmid length >0
+			// check of the crmid is free
+			ensure!(CrmData::contains_key(&crmid)==false, Error::<T>::DuplicatedCrmId);
 			// check json validity
 			let js=crmdata.clone();
 			ensure!(json_check_validity(js),Error::<T>::InvalidJson);
@@ -288,47 +280,45 @@ decl_module! {
 			// Write storage for crmdata
 			let crmstorage=crmdata.clone();
 			let crmidstorage=crmid.clone();
-			<CrmData<T>>::insert(&sender, crmidstorage, crmstorage);
+			CrmData::insert(&crmidstorage, crmstorage);
 			// Write storage for master data
 			let masterstorage=master.clone();
 			let masteridstorage=crmid.clone();
-			<CrmMasterData<T>>::insert(&sender, masteridstorage, masterstorage);
+			CrmMasterData::insert(masteridstorage, masterstorage);
 			// Write storage for Composition data
 			let compositionstorage=composition.clone();
 			let compositionidstorage=crmid.clone();
-			<CrmCompositionData<T>>::insert(&sender, compositionidstorage, compositionstorage);
+			CrmCompositionData::insert(compositionidstorage, compositionstorage);
 			// write storage for Other Contracts data (optional)
-			if othercontracts.len()>0{
+			if othercontracts.len()>0 {
 				// Update storage for Other Contracts data
 				let othercontractsstorage=othercontracts.clone();
 				let othercontractsidstorage=crmid.clone();
-				<CrmOtherContractsData<T>>::insert(&sender, othercontractsidstorage, othercontractsstorage);
+				CrmOtherContractsData::insert(othercontractsidstorage, othercontractsstorage);
 			}
 			// Emit an event
 			Self::deposit_event(RawEvent::CrmAdded(sender,crmid));
 			// Return a successful DispatchResult
 			Ok(())
 		}
-		
-		// function to submit a change proposal that must be approved by the quorum initially set
+		/// Submit a change proposal that must be approved by the quorum 
 		#[weight = 50_000]
-		pub change_proposal_crmdata(origin, contractid: Vec<u8>, crmdata: Vec<u8>) -> dispatch::DispatchResult {
+		pub fn change_proposal_crmdata(origin, crmid: Vec<u8>, crmdata: Vec<u8>) -> dispatch::DispatchResult {
 			// Check that the extrinsic is signed and get the signer.
 			let sender = ensure_signed(origin)?;
 			// check contractid
-			ensure!(contractid.len() >= 33, Error::<T>::ContractIdTooShort); //check minimum length
-			ensure!(contractid.len() <= 128, Error::<T>::ContractIdTooLong); //check maximum length
+			ensure!(crmid.len() > 1, Error::<T>::ContractIdTooShort); //check minimum length
 			// check that at the least some data to change has been received and it's not too long
-			ensure!(crmdata.len()>0, Error::<T>::<MissingContractData>); 
-			ensure!(crmdata.len()<1024, Error::<T>::<CrmDataTooLong>); 
-			// search the contractid in the storage
+			ensure!(crmdata.len()>0, Error::<T>::MissingContractData); 
+			ensure!(crmdata.len()<1024, Error::<T>::CrmDataTooLong); 
+			//ensure!(<CrmData<T>>::contains_key(&sender_str,crmid)==true, Error::<T>::ContractIdNotFound);
 			// check the sender is part of the data submitted
 			// store the proposal
 			// Emit an event
-			Self::deposit_event(RawEvent::CrmDataChangeProposal(sender,contractid));
-			// Return a successful DispatchResult
+			Self::deposit_event(RawEvent::CrmDataChangeProposal(sender,crmid));
 			Ok(())
 		}
+
 	}
 }
 // function to validate a json string for no/std. It does not allocate of memory
