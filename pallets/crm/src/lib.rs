@@ -217,7 +217,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "0"
             };
-            let globalquorumvalue:u64 = match u64::from_str(globalquorum_str){
+            let globalquorumvalue:u32 = match u32::from_str(globalquorum_str){
                 Ok(f) => f,
                 Err(_) => 0,
             };
@@ -231,7 +231,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "0"
             };
-            let mastersharevalue:u64 = match u64::from_str(mastershare_str){
+            let mastersharevalue:u32 = match u32::from_str(mastershare_str){
                 Ok(f) => f,
                 Err(_) => 0,
             };
@@ -245,7 +245,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "0"
             };
-            let masterquorumvalue:u64 = match u64::from_str(masterquorum_str){
+            let masterquorumvalue:u32 = match u32::from_str(masterquorum_str){
                 Ok(f) => f,
                 Err(_) => 0,
             };
@@ -259,7 +259,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "0"
             };
-            let compositionsharevalue:u64 = match u64::from_str(compositionshare_str){
+            let compositionsharevalue:u32 = match u32::from_str(compositionshare_str){
                 Ok(f) => f,
                 Err(_) => 0,
             };
@@ -273,7 +273,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "0"
             };
-            let compositionquorumvalue:u64 = match u64::from_str(compositionquorum_str){
+            let compositionquorumvalue:u32 = match u32::from_str(compositionquorum_str){
                 Ok(f) => f,
                 Err(_) => 0,
             };
@@ -287,7 +287,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "100"
             };
-            let othercontractssharevalue:u64 = match u64::from_str(othercontractsshare_str){
+            let othercontractssharevalue:u32 = match u32::from_str(othercontractsshare_str){
                 Ok(f) => f,
                 Err(_) => 100,
             };
@@ -300,7 +300,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "100"
             };
-            let othercontractsquorumvalue:u64 = match u64::from_str(othercontractsquorum_str){
+            let othercontractsquorumvalue:u32 = match u32::from_str(othercontractsquorum_str){
                 Ok(f) => f,
                 Err(_) => 100,
             };
@@ -313,7 +313,7 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => "0"
             };
-            let crodwfundingsharevalue:u64 = match u64::from_str(crodwfundingshare_str){
+            let crodwfundingsharevalue:u32 = match u32::from_str(crodwfundingshare_str){
                 Ok(f) => f,
                 Err(_) => 0,
             };
