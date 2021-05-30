@@ -111,6 +111,14 @@ decl_error! {
 		MissingMasterPercentage,
 		/// Wrong Total Percentage Master
 		WrongTotalPercentageMaster,
+		/// Missing Nick name in Composition data record
+		MissingCompositionNickname,
+		/// Missing Account id in Composition data record
+		MissingCompositionAccount,
+		/// Missing percentage in Composition data record
+		MissingCompositionPercentage,
+		/// Wrong Total Percentage Master
+		WrongTotalPercentageComposition,
 	}
 }
 
@@ -293,6 +301,7 @@ decl_module! {
 			// check that the total shares are = 100 
 			let totalshares=mastersharevalue+compositionsharevalue+othercontractssharevalue+crodwfundingsharevalue;
 			ensure!(totalshares == 100, Error::<T>::InvalidTotalShares); //check total shares that must be 100
+
 			// check validity of master data
 			let masterclone=master.clone();
 			// check for a valid json
@@ -330,6 +339,44 @@ decl_module! {
 			}
 			// check the total percentage is = 100
 			ensure!(totpercentage == 100, Error::<T>::WrongTotalPercentageMaster); 
+
+			// check validity of composition data
+			let compositionclone=composition.clone();
+			// check for a valid json
+			ensure!(json_check_validity(compositionclone),Error::<T>::InvalidJson);
+			x=0;
+			totpercentage= 0;
+			// check validity of records for Composition Data
+			loop {
+				let jr=json_get_recordvalue(composition.clone(),x);
+				if jr.len()==0 {
+					break;
+				}
+				// check for nickname
+				let nickname=json_get_value(jr.clone(),"nickname".as_bytes().to_vec());
+				ensure!(nickname.len() >0, Error::<T>::MissingCompositionNickname); 
+				// check for account address
+				let account=json_get_value(jr.clone(),"account".as_bytes().to_vec());
+				ensure!(account.len() >0, Error::<T>::MissingCompositionAccount);
+				// check for percentage
+				let percentage=json_get_value(jr.clone(),"percentage".as_bytes().to_vec());
+				ensure!(percentage.len() >0, Error::<T>::MissingCompositionPercentage);
+				// convert percentage from vec to u32
+				let percentage_slice=percentage.as_slice();
+            	let percentage_str=match str::from_utf8(&percentage_slice){
+                	Ok(f) => f,
+                	Err(_) => "0"
+            	};
+            	let percentagevalue:u32 = match u32::from_str(percentage_str){
+                	Ok(f) => f,
+                	Err(_) => 0,
+            	};
+				// sum percentage to totpercentage
+				totpercentage=totpercentage+percentagevalue;
+				x=x+1;
+			}
+			// check the total percentage is = 100
+			ensure!(totpercentage == 100, Error::<T>::WrongTotalPercentageComposition); 
 
 
 			//****************************************
