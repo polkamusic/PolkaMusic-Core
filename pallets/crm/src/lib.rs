@@ -109,7 +109,7 @@ decl_error! {
 		MissingMasterAccount,
 		/// Missing percentage in Master data record
 		MissingMasterPercentage,
-		/// Wrong Total Percentage Master
+		/// Wrong Total Percentage Master data
 		WrongTotalPercentageMaster,
 		/// Missing Nick name in Composition data record
 		MissingCompositionNickname,
@@ -117,8 +117,12 @@ decl_error! {
 		MissingCompositionAccount,
 		/// Missing percentage in Composition data record
 		MissingCompositionPercentage,
-		/// Wrong Total Percentage Master
+		/// Wrong Total Percentage Composition data
 		WrongTotalPercentageComposition,
+		/// Missing Other contract id
+		MissingOtherContractsId,
+		/// Wrong Total Percentage Other Contracts
+		WrongTotalPercentageOtherContracts,
 	}
 }
 
@@ -378,6 +382,44 @@ decl_module! {
 			// check the total percentage is = 100
 			ensure!(totpercentage == 100, Error::<T>::WrongTotalPercentageComposition); 
 
+
+			// Other contracts are optional we check the validity if there is a value only
+			if othercontracts.len()>0 {
+				// check validity of othercontracts data
+				let othercontractsclone=othercontracts.clone();
+				// check for a valid json
+				ensure!(json_check_validity(othercontractsclone),Error::<T>::InvalidJson);
+				x=0;
+				totpercentage= 0;
+				// check validity of records for other contracts data
+				loop {
+					let jr=json_get_recordvalue(othercontracts.clone(),x);
+					if jr.len()==0 {
+						break;
+					}
+					// check for nickname
+					let id=json_get_value(jr.clone(),"id".as_bytes().to_vec());
+					ensure!(id.len() >0, Error::<T>::MissingOtherContractsId); 
+					// check for percentage
+					let percentage=json_get_value(jr.clone(),"percentage".as_bytes().to_vec());
+					ensure!(percentage.len() >0, Error::<T>::MissingCompositionPercentage);
+					// convert percentage from vec to u32
+					let percentage_slice=percentage.as_slice();
+            		let percentage_str=match str::from_utf8(&percentage_slice){
+                		Ok(f) => f,
+                		Err(_) => "0"
+            		};
+            		let percentagevalue:u32 = match u32::from_str(percentage_str){
+                		Ok(f) => f,
+                		Err(_) => 0,
+            		};
+					// sum percentage to totpercentage
+					totpercentage=totpercentage+percentagevalue;
+					x=x+1;
+				}
+				// check the total percentage is = 100
+				ensure!(totpercentage == 100, Error::<T>::WrongTotalPercentageOtherContracts); 
+			}
 
 			//****************************************
 			// STORING DATA 
