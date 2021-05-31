@@ -57,7 +57,7 @@ decl_event!(
 	pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId {
 		CrmAdded(AccountId, u32),					// New contract has been added
 		CrmDataNewChangeProposal(AccountId, u32),	// A proposal change has been submitted
-		CrmChangeVote(AccountId, u32),		    	// A vote to a change proposal has been received
+		CrmDataChangeVote(AccountId, u32),		    // A vote for a crm data change proposal has been received
 		CrmDataChanged(AccountId, u32),				// Crm data has been changed
 		CrmMasterChanged(AccountId, u32),	    	// Crm master data has been changed
 		CrmCompositionChanged(AccountId, u32),		// Crm composition data has been changed
@@ -141,6 +141,10 @@ decl_error! {
 		WrongTotalPercentageOtherContracts,
 		/// Changed Proposal Id is already present on chain
 		ChangeIdDuplicated,
+		/// Missing Change Id
+		MissingChangeId,
+		/// Change Id not found
+		ChangeIdNotFound,
 	}
 }
 
@@ -487,7 +491,7 @@ decl_module! {
 			// Check that the extrinsic is signed and get the signer.
 			let sender = ensure_signed(origin)?;
 			// check contractid
-			ensure!(crmid > 1, Error::<T>::ContractIdTooShort); //check minimum length
+			ensure!(crmid > 0, Error::<T>::ContractIdTooShort); //check minimum number
 			// check that at the least some data to change has been received and it's not too long
 			ensure!(crmdata.len()>0, Error::<T>::MissingContractData); 
 			ensure!(crmdata.len()<1024, Error::<T>::CrmDataTooLong); 
@@ -620,7 +624,7 @@ decl_module! {
 			ensure!(totalshares == 100, Error::<T>::InvalidTotalShares); //check total shares that must be 100			
 			// store the proposal data in the queue.
 			CrmDataChangeProposal::insert(crmid.clone(),changeid.clone(), crmdata.clone());
-			// store initial voting results
+			// store initial voting results with current quorum to change the data
 			let v= Voting {
 				changeid: changeid.clone(),
 				crmid: crmid.clone(),
@@ -635,8 +639,46 @@ decl_module! {
 			Self::deposit_event(RawEvent::CrmDataNewChangeProposal(sender,crmid));
 			Ok(())
 		}
-		
-		
+		/// Vote a change proposal for CRM data 
+		#[weight = 10_000]
+		pub fn vote_proposal_crmdata(origin, changeid: u32, crmid: u32, vote: bool) -> dispatch::DispatchResult {
+			// Check that the extrinsic is signed and get the signer.
+			let sender = ensure_signed(origin)?;
+			// check contractid
+			ensure!(changeid > 0, Error::<T>::ContractIdTooShort); //check minimum length
+			ensure!(crmid > 0, Error::<T>::ContractIdTooShort); //check minimum length
+			// check the contract id is on chain
+			ensure!(CrmData::contains_key(&crmid)==true, Error::<T>::InvalidContractId);	
+			// check the changeid  is NOT on chain
+			ensure!(CrmDataChangeProposal::contains_key(crmid.clone(),changeid.clone())==true, Error::<T>::ChangeIdNotFound);	
+			// check the signer has rigth of vote (TODO)
+			let percentage:u32=10; //to be read from above TODO
+			let mut v:Voting=CrmDataChangeVoting::get(crmid.clone(),changeid.clone()).unwrap();	
+			let currentpervotesyes=v.percvotesyes;
+			// update the structure
+			if vote==true {
+				v.nrvotesyes=v.nrvotesyes+1;
+				v.percvotesyes=v.percvotesyes+percentage;
+			}else {
+				v.nrvotesno=v.nrvotesno+1;
+				v.percvotesno=v.percvotesno+percentage;
+			}
+			//update the storage with voting results
+			CrmDataChangeVoting::remove(crmid.clone(),changeid.clone());
+			CrmDataChangeVoting::insert(crmid.clone(),changeid.clone(),v.clone());
+			// Emit an event to alert the user of the vote received
+			Self::deposit_event(RawEvent::CrmDataChangeVote(sender.clone(),crmid));
+			// if quorum has been reached the replace the current CRM data
+			if v.quorum<=v.percvotesyes && v.quorum>currentpervotesyes {
+				let crmdata=CrmDataChangeProposal::get(crmid.clone(),changeid.clone()).unwrap();
+				CrmData::remove(crmid.clone());
+				CrmData::insert(crmid.clone(), crmdata.clone());
+				// Emit an event to alert the user of the crm data change done
+				Self::deposit_event(RawEvent::CrmDataChanged(sender,crmid));
+			}
+			// returns back with no errors
+			Ok(())
+		}
 	}
 }
 
