@@ -10,6 +10,8 @@ use core::str::FromStr;
 use sp_runtime::{traits::AccountIdConversion, TypeId, AccountId32};
 
 
+
+
 // structure to keep the voting progresses/results of the change proposals
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
 pub struct Voting {
@@ -655,7 +657,7 @@ decl_module! {
 			let percentage:u32=10; //to be read from above TODO
 			let mut v:Voting=CrmDataChangeVoting::get(crmid.clone(),changeid.clone()).unwrap();	
 			let currentpervotesyes=v.percvotesyes;
-			// update the structure
+			// update the voting structure
 			if vote==true {
 				v.nrvotesyes=v.nrvotesyes+1;
 				v.percvotesyes=v.percvotesyes+percentage;

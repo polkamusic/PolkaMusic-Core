@@ -91,7 +91,7 @@ You should select your node address, for example ws://127.0.0.1:9944
 
 The callable functions aredivided in module (pallets), here the main modules:  
 
-### Balances
+## Balances
 
 The Balances module provides functions for:  
 - Getting and setting free balances.  
@@ -122,6 +122,111 @@ Queries:
 - account(AccountId)-> AccountData - Get the balance of an account.  
 - locks(AccountId)-> Vec<BalanceLock> - Any liquidity locks on the signing account balances.  
 - totalissuance -> Balance - The total amount issued in the blockchain.  
+
+
+
+## CRM - Contract Rights Management
+The Crm module is central to the managements of contracts rights. It allows to:
+1) Store a new contract for rights managements, settings rules od sharing and quorums required to change the contract.  
+2) Submit a change proposal of the rights managament that must be voted.  
+3) Vote for a change proposal of rights management.  
+
+### Add new contract. 
+```newContract(crmid,crmdata,master,composition,othercontracts)```
+This functions allow to store a new contracts for rights management with multiple fields:  
+
+- "crmid" is the unique id of the contract (unsigned number 32 bit - u32).  
+The generation of a unique is is external the logic of the blockchain. The function will check for duplicated id.  
+
+- "crmdata" should contains a json structure regarding the main information of the contracts as follows:  
+{  
+	"ipfshash": "xxxxxx",            				// ipfs hash of the metadata (one hash is usable for whole folder of files)  
+	"ipfshashprivate": ["xxxxxx","yyyyyyyy",..]     // ipfs hash array for the private files (audio and artworks)  
+	"globalquorum": 80			    				// the quorum required to change the shares of master/composition and othercontracts (crowdfundingshare are not changeable)  
+	"mastershare":30,               				// the shares for the master  
+	"masterquorum":51,								// the quorum required to change the master data  
+	"compositionshare": 30,         				// the shares of the composition group  
+	"compositionquorum":51,							// the quorum required to change the composition data  
+	"othercontractsshare": 20, 						// other contracts crowdfundingshare get shares (optional)  
+	"othercontratsquorum":75,  						// the quorum required to change the other countracts data  
+	"crowdfundingshare": 20,  						// crowd founders can get share   
+	"crowdfounders": "xxxxxx"					    // crowd funding campaign Id  
+}  
+for example:  
+```
+{"ipfshash":"0E7071C59DF3B9454D1D18A15270AA36D54F89606A576DC621757AFD44AD1D2E","ipfshashprivate": "B45165ED3CD437B9FFAD02A2AAD22A4DDC69162470E2622982889CE5826F6E3D","globalquorum":100,"mastershare":50,"masterquorum":51,"compositionshare":30,"compositionquorum":51,"othercontractsshare":20,"othercontractsquorum":51}  
+```
+
+- "master" field should contains a json with the informations regarding the shares for the Master(s):
+{
+    "master": [
+        {"nickname": "xxxxxxxxxxxxx",                                                       // the nickname of the master's account
+         "account": "0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48"    // the account of the master in hexadecimal format
+         "percentage: xx}                                                                   // the percentage of rights for this master 
+         ,{....}                                                                            // other master record
+    ]
+}
+To be noticed that the total of the percentages must be = 100
+for example:  
+```
+{"master": [{"nickname": "Bob","account": "0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48","percentage": 50},{"nickname": "Bob Stash","account": "0xfe65717dad0447d715f660a0a58411de509b42e6efb8375f562f58a554d5860e","percentage": 50}]}
+```
+
+- "composition" field should contains a json with the informations regarding the shares for the composition members:
+{  
+    "composition": [  
+        {"nickname": "xxxxxxxxxxxxx",                                                       // the nickname of the composition member's account  
+         "account": "0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48"    // the account of the composition member in hexadecimal format  
+         "percentage: xx}                                                                   // the percentage of rights for this composition member  
+         ,{....}                                                                            // other composition member record record  
+    ]  
+}  
+To be noticed that the total of the percentages must be = 100  
+for example:  
+```
+{"composition": [{"nickname": "Charlie","account": "0x90b5ab205c6974c9ea841be688864633dc9ca8a357843eeacf2314649965fe22","percentage": 50},{"nickname": "Dave","account": "0x306721211d5404bd9da88e0204360a1a9ab8b87c66c1bc2fcdd37f3c2222cc20","percentage": 50}]}  
+```
+- "othercontracts" field should contains a json with the informations the shares assigned to other contracts, this field is optional:  
+{  
+    "othercontracts": 
+    [{  "id": x,                // contract id, it must be already present on chain  
+        "percentage": xx        // percentage assigned to this contract id  
+    },  
+    {..}                        // other contract id/percentage  
+
+To be noticed that the total of the percentages must be = 100.  
+for example:  
+```
+{"othercontracts": [{"id": 1,"percentage": 50},{"id": 2,"percentage": 50}]}
+```
+
+
+### Change Proposal for main CRM data
+
+Once stored, the contract for right management can changed only through a voting process of the member.  
+This functions allow to submit a change proposal from any account. Gas fees are chargded to limit spamming activities.  
+The main data of the contract can be changed with the vote of all the rights owners.  
+To submit a change proposal for the main CRM data, there is a specific function:  
+```changeProposalCrmdata(changeid, crmid, crmdata)```  
+- "changeid" is a unique id (unsigned number 32 bit - u32) to be assigned for the proposalof a specific contract id.  
+Different contract id can have the same change id.  
+The whole key is build from contract id + change id.  
+- "crmid" is the unique id number of an existant contract for right management.  
+- "crmdata" is the new json structure in the same format used for creating the new contract. 
+
+The functions generates events that can be intercepted for alterting the parts involved.
+
+### Voting Change Proposal  
+
+The change proposal are kept in the queue for voting until they reach the quorum required. The user interface may decide for not showing the proposal after xx blocks.  
+
+```voteProposalCrmdata(changeid, crmid, vote)```  
+- "changeid" is a unique id (unsigned number 32 bit - u32) to be assigned for the proposalof a specific contract id.  
+Different contract id can have the same change id.  
+The whole key is build from contract id + change id.  
+- "crmid" is the unique id number of an existant contract for right management.  
+- "vote" - is a booelan variable. It can be set to "Yes/True" to approve the proposal or "No/False" to disapprove.  
+
 
 
 
