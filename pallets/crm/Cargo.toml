@@ -24,10 +24,10 @@ frame-system = { default-features = false, version = '3.0.0' }
 sp-std = { default-features = false, version = '3.0.0' }
 sp-runtime = { default-features = false, version = '3.0.0' }
 sp-io = { default-features = false, version = '3.0.0' }
+sp-core = { default-features = false, version = '3.0.0' }
 primitive-types =  { default-features = false, version = '0.7.3'}
 rand =  { default-features = false, version = '0.7.3'}
-bs58 = { default-features = false, version = '0.4.0'}
-
+hex = { default-features = false, version = '0.4'}
 
 [dev-dependencies]
 serde = { version = "1.0.119" }
@@ -44,5 +44,6 @@ std = [
     'sp-std/std',
     'sp-runtime/std',
     'sp-io/std',
-    'bs58/std',
+    'sp-core/std',
+    'hex/std',
 ]

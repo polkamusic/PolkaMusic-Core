@@ -7,8 +7,10 @@ use frame_system::ensure_signed;
 use sp_std::prelude::*;
 use core::str;
 use core::str::FromStr;
+use sp_runtime::{traits::AccountIdConversion, TypeId, AccountId32};
 
-// structure to keep the voting results of the change proposal
+
+// structure to keep the voting progresses/results of the change proposals
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
 pub struct Voting {
 	changeid: u32,
@@ -172,9 +174,9 @@ decl_module! {
 		crmdata can be:
 		{"ipfshash":"0E7071C59DF3B9454D1D18A15270AA36D54F89606A576DC621757AFD44AD1D2E","ipfshashprivate": "B45165ED3CD437B9FFAD02A2AAD22A4DDC69162470E2622982889CE5826F6E3D","globalquorum":100,"mastershare":50,"masterquorum":51,"compositionshare":30,"compositionquorum":51,"othercontractsshare":20,"othercontractsquorum":51}
 		master can be:
-		{"master": [{"nickname": "Bob","account": "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty","percentage": 50},{"nickname": "Bob Stash","account": "5HpG9w8EBLe5XCrbczpwq5TSXvedjrBGCwqxK1iQ7qUsSWFc","percentage": 50}]}
+		{"master": [{"nickname": "Bob","account": "0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48","percentage": 50},{"nickname": "Bob Stash","account": "0xfe65717dad0447d715f660a0a58411de509b42e6efb8375f562f58a554d5860e","percentage": 50}]}
 		composition can be:
-		{"composition": [{"nickname": "Charlie","account": "5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y","percentage": 50},{"nickname": "Dave","account": "5DAAnrj7VHTznn2AWBemMuyBwZWs6FNFjdyVXUeYum3PTXFy","percentage": 50}]}
+		{"composition": [{"nickname": "Charlie","account": "0x90b5ab205c6974c9ea841be688864633dc9ca8a357843eeacf2314649965fe22","percentage": 50},{"nickname": "Dave","account": "0x306721211d5404bd9da88e0204360a1a9ab8b87c66c1bc2fcdd37f3c2222cc20","percentage": 50}]}
 		Other Contracts shares can be (contracts id must exist on chain):
 		{"othercontracts": [{"id": 1,"percentage": 50},{"id": 2,"percentage": 50}]}
 		*/
@@ -476,6 +478,8 @@ decl_module! {
 			// Return a successful DispatchResult
 			Ok(())
 		}
+		
+
 
 		/// Submit a change proposal for CRM data that must be approved by the quorum 
 		#[weight = 50_000]
@@ -631,9 +635,35 @@ decl_module! {
 			Self::deposit_event(RawEvent::CrmDataNewChangeProposal(sender,crmid));
 			Ok(())
 		}
+		
+		
 	}
 }
 
+// function to convert an account address from an hex string  to Substrate AccountId32
+fn hex_account_to_account_id(hexaddress: Vec<u8>) -> Option<AccountId32>{
+	// converts Vec<u8> to str
+	let accountstr: &str = match str::from_utf8(&hexaddress) {
+		Ok(s) => s,
+		Err(_) => return None,
+	};
+	//converts the str to byte array
+	let buffer: [u8; 32] = match hex::FromHex::from_hex(&accountstr) {
+		Ok(s) => s,
+		Err(_) => return None,
+	};
+	// defines structure for conversion to AccountId
+	#[derive(Clone, Copy, Eq, PartialEq, Encode, Decode)]
+	struct AcId(pub [u8; 32]);
+	impl TypeId for AcId {
+		const TYPE_ID: [u8; 4] = *b"acid";
+	}
+	//converts to AccountId
+	let accid: AcId =AcId(buffer);
+	let ac=AccountIdConversion::<AccountId32>::into_account(&accid);
+	// returns the account id as option
+	Some(ac)
+}
 // function to validate a json string for no/std. It does not allocate of memory
 fn json_check_validity(j:Vec<u8>) -> bool{	
     // minimum lenght of 2
