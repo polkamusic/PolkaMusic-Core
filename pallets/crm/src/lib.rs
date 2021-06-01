@@ -10,8 +10,6 @@ use core::str::FromStr;
 use sp_runtime::{traits::AccountIdConversion, TypeId, AccountId32};
 
 
-
-
 // structure to keep the voting progresses/results of the change proposals
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
 pub struct Voting {
@@ -50,6 +48,7 @@ decl_storage! {
 		CrmOtherContractsData get(fn get_othercontracts): map hasher(blake2_128_concat) u32 => Option<Vec<u8>>;
 		// Change proposal queue for Crm Data
 		CrmDataChangeProposal get(fn get_crmdata_change_proposal): double_map hasher(blake2_128_concat) u32, hasher(blake2_128_concat) u32 => Option<Vec<u8>>;
+		// Voting storage for the change proposals
 		CrmDataChangeVoting get(fn get_crmdata_change_voting): double_map hasher(blake2_128_concat) u32, hasher(blake2_128_concat) u32 => Option<Voting>;
 	}
 }
@@ -139,6 +138,8 @@ decl_error! {
 		WrongTotalPercentageComposition,
 		/// Missing Other contract id
 		MissingOtherContractsId,
+		/// Missing other contracts percentage
+		MissingOtherContractsPercentage,
 		/// Wrong Total Percentage Other Contracts
 		WrongTotalPercentageOtherContracts,
 		/// Changed Proposal Id is already present on chain
@@ -147,6 +148,8 @@ decl_error! {
 		MissingChangeId,
 		/// Change Id not found
 		ChangeIdNotFound,
+		/// Signer as no rights to vote in this contract
+		SignerHasNoRightsForVoting,
 	}
 }
 
@@ -651,19 +654,158 @@ decl_module! {
 			ensure!(crmid > 0, Error::<T>::ContractIdTooShort); //check minimum length
 			// check the contract id is on chain
 			ensure!(CrmData::contains_key(&crmid)==true, Error::<T>::InvalidContractId);	
-			// check the changeid  is NOT on chain
+			// check the changeid is on chain
 			ensure!(CrmDataChangeProposal::contains_key(crmid.clone(),changeid.clone())==true, Error::<T>::ChangeIdNotFound);	
-			// check the signer has rigth of vote (TODO)
-			let percentage:u32=10; //to be read from above TODO
+			// get the percentage of votes for "Masters"
+			let crmdata=CrmData::get(&crmid).unwrap();
+			let js=crmdata.clone();
+			let mastershare=json_get_value(js,"mastershare".as_bytes().to_vec());
+			let mastershare_slice=mastershare.as_slice();
+            let mastershare_str=match str::from_utf8(&mastershare_slice){
+                Ok(f) => f,
+                Err(_) => "0"
+            };
+            let mastersharevalue:u32 = match u32::from_str(mastershare_str){
+                Ok(f) => f,
+                Err(_) => 0,
+            };
+			// get the percentage of votes for "Composition"
+			let jsc=crmdata.clone();
+			let compositionshare=json_get_value(jsc,"compositionshare".as_bytes().to_vec());
+			let compositionshare_slice=compositionshare.as_slice();
+            let compositionshare_str=match str::from_utf8(&compositionshare_slice){
+                Ok(f) => f,
+                Err(_) => "0"
+            };
+            let compositionsharevalue:u32 = match u32::from_str(compositionshare_str){
+                Ok(f) => f,
+                Err(_) => 0,
+            };
+			// check if the signer is one of the Master Accounts
+			let masterdata=CrmMasterData::get(crmid.clone()).unwrap();
+			let mut x=0;
+			let mut votepercentage=0;
+			loop {
+				let jr=json_get_recordvalue(masterdata.clone(),x);
+				if jr.len()==0 {
+					break;
+				}
+				let account=json_get_value(jr.clone(),"account".as_bytes().to_vec());
+				ensure!(account.len() >0, Error::<T>::MissingMasterAccount);
+				// check for percentage
+				let percentage=json_get_value(jr.clone(),"percentage".as_bytes().to_vec());
+				ensure!(percentage.len() >0, Error::<T>::MissingMasterPercentage);
+				// convert percentage from vec to u32
+				let percentage_slice=percentage.as_slice();
+            	let percentage_str=match str::from_utf8(&percentage_slice){
+                	Ok(f) => f,
+                	Err(_) => "0"
+            	};
+            	let percentagevalue:u32 = match u32::from_str(percentage_str){
+                	Ok(f) => f,
+                	Err(_) => 0,
+            	};
+				// convert Account Vec<u8> to AccountId formatm first in str
+				let accountstr: &str =  str::from_utf8(&account).unwrap();
+				//converts the str to byte array
+				let buffer: [u8; 32] =  hex::FromHex::from_hex(&accountstr).unwrap();
+				// finally convert to AccountId
+				let accountid=T::AccountId::decode(&mut &buffer[..]).unwrap();
+				// verify account matching between AccountId types
+				if accountid==sender{
+					if mastersharevalue>0 {
+						votepercentage=votepercentage+(percentagevalue*mastersharevalue/100);
+					}
+				}
+				x=x+1;
+			}
+			// check if the signer is one of the Composition Accounts
+			let compositiondata=CrmCompositionData::get(crmid.clone()).unwrap();
+			x=0;
+			loop {
+				let jr=json_get_recordvalue(compositiondata.clone(),x);
+				if jr.len()==0 {
+					break;
+				}
+				let account=json_get_value(jr.clone(),"account".as_bytes().to_vec());
+				ensure!(account.len() >0, Error::<T>::MissingCompositionAccount);
+				// check for percentage
+				let percentage=json_get_value(jr.clone(),"percentage".as_bytes().to_vec());
+				ensure!(percentage.len() >0, Error::<T>::MissingCompositionPercentage);
+				// convert percentage from vec to u32
+				let percentage_slice=percentage.as_slice();
+            	let percentage_str=match str::from_utf8(&percentage_slice){
+                	Ok(f) => f,
+                	Err(_) => "0"
+            	};
+            	let percentagevalue:u32 = match u32::from_str(percentage_str){
+                	Ok(f) => f,
+                	Err(_) => 0,
+            	};
+				// convert Account Vec<u8> to AccountId formatm first in str
+				let accountstr: &str =  str::from_utf8(&account).unwrap();
+				//converts the str to byte array
+				let buffer: [u8; 32] =  hex::FromHex::from_hex(&accountstr).unwrap();
+				// finally convert to AccountId
+				let accountid=T::AccountId::decode(&mut &buffer[..]).unwrap();
+				// verify account matching between AccountId types
+				if accountid==sender{
+					if compositionsharevalue>0 {
+						votepercentage=votepercentage+(percentagevalue*compositionsharevalue/100);
+					}
+				}
+				x=x+1;
+			}
+			
+			// check if the signer is part of any "other contract"
+			let othercontractsdata=CrmOtherContractsData::get(crmid.clone()).unwrap();
+			x=0;
+			loop {
+				let jr=json_get_recordvalue(othercontractsdata.clone(),x);
+				if jr.len()==0 {
+					break;
+				}
+				let id=json_get_value(jr.clone(),"id".as_bytes().to_vec());
+				ensure!(id.len() >0, Error::<T>::InvalidContractId);
+				let id_slice=id.as_slice();
+            	let id_str=match str::from_utf8(&id_slice){
+                	Ok(f) => f,
+                	Err(_) => "0"
+            	};
+            	let idvalue:u32 = match u32::from_str(id_str){
+                	Ok(f) => f,
+                	Err(_) => 0,
+            	};
+				ensure!(idvalue==0, Error::<T>::InvalidContractId);
+				// check for percentage
+				let percentage=json_get_value(jr.clone(),"percentage".as_bytes().to_vec());
+				ensure!(percentage.len() >0, Error::<T>::MissingOtherContractsPercentage);
+				// convert percentage from vec to u32
+				let percentage_slice=percentage.as_slice();
+            	let percentage_str=match str::from_utf8(&percentage_slice){
+                	Ok(f) => f,
+                	Err(_) => "0"
+            	};
+            	let percentagevalue:u32 = match u32::from_str(percentage_str){
+                	Ok(f) => f,
+                	Err(_) => 0,
+            	};
+				ensure!(percentagevalue>0, Error::<T>::MissingOtherContractsPercentage);
+				// TODO get percentageofvote from other contracts
+				x=x+1;
+			}
+			// check if the signer has rights to vote >0
+			ensure!(votepercentage > 0, Error::<T>::SignerHasNoRightsForVoting); 
+			// store the vote
 			let mut v:Voting=CrmDataChangeVoting::get(crmid.clone(),changeid.clone()).unwrap();	
 			let currentpervotesyes=v.percvotesyes;
 			// update the voting structure
 			if vote==true {
 				v.nrvotesyes=v.nrvotesyes+1;
-				v.percvotesyes=v.percvotesyes+percentage;
+				v.percvotesyes=v.percvotesyes+votepercentage;
 			}else {
 				v.nrvotesno=v.nrvotesno+1;
-				v.percvotesno=v.percvotesno+percentage;
+				v.percvotesno=v.percvotesno+votepercentage;
 			}
 			//update the storage with voting results
 			CrmDataChangeVoting::remove(crmid.clone(),changeid.clone());
@@ -680,7 +822,7 @@ decl_module! {
 			}
 			// returns back with no errors
 			Ok(())
-		}
+		}	
 	}
 }
 
@@ -703,7 +845,7 @@ fn hex_account_to_account_id(hexaddress: Vec<u8>) -> Option<AccountId32>{
 		const TYPE_ID: [u8; 4] = *b"acid";
 	}
 	//converts to AccountId
-	let accid: AcId =AcId(buffer);
+	let accid: AcId =AcId(buffer.clone());
 	let ac=AccountIdConversion::<AccountId32>::into_account(&accid);
 	// returns the account id as option
 	Some(ac)
