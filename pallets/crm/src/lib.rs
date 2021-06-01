@@ -681,6 +681,19 @@ decl_module! {
                 Ok(f) => f,
                 Err(_) => 0,
             };
+			// get the percentage of votes for "OtherContracts"
+			let jsc=crmdata.clone();
+			let othercontractsshare=json_get_value(jsc,"othercontractssshare".as_bytes().to_vec());
+			let othercontractsshare_slice=othercontractsshare.as_slice();
+            let othercontractsshare_str=match str::from_utf8(&othercontractsshare_slice){
+                Ok(f) => f,
+                Err(_) => "0"
+            };
+            let othercontractssharevalue:u32 = match u32::from_str(othercontractsshare_str){
+                Ok(f) => f,
+                Err(_) => 0,
+            };
+
 			// check if the signer is one of the Master Accounts
 			let masterdata=CrmMasterData::get(crmid.clone()).unwrap();
 			let mut x=0;
@@ -714,7 +727,7 @@ decl_module! {
 				// verify account matching between AccountId types
 				if accountid==sender{
 					if mastersharevalue>0 {
-						votepercentage=votepercentage+(percentagevalue*mastersharevalue/100);
+						votepercentage=votepercentage+(percentagevalue*othercontractssharevalue/100);
 					}
 				}
 				x=x+1;
@@ -791,7 +804,45 @@ decl_module! {
                 	Err(_) => 0,
             	};
 				ensure!(percentagevalue>0, Error::<T>::MissingOtherContractsPercentage);
-				// TODO get percentageofvote from other contracts
+				// check Master record of the other contract
+				let mut xx=0;
+				let masterdata=CrmMasterData::get(idvalue.clone()).unwrap();
+				loop {
+					let jr=json_get_recordvalue(masterdata.clone(),x);
+					if jr.len()==0 {
+						break;
+					}
+					let account=json_get_value(jr.clone(),"account".as_bytes().to_vec());
+					ensure!(account.len() >0, Error::<T>::MissingMasterAccount);
+					// check for percentage
+					let percentage=json_get_value(jr.clone(),"percentage".as_bytes().to_vec());
+					ensure!(percentage.len() >0, Error::<T>::MissingMasterPercentage);
+					
+					// convert percentage from vec to u32
+					let percentage_slice=percentage.as_slice();
+            		let percentage_str=match str::from_utf8(&percentage_slice){
+                		Ok(f) => f,
+                		Err(_) => "0"
+            		};
+            		let percentagevalue:u32 = match u32::from_str(percentage_str){
+                		Ok(f) => f,
+                		Err(_) => 0,
+            		};
+					
+					// convert Account Vec<u8> to AccountId formatm first in str
+					let accountstr: &str =  str::from_utf8(&account).unwrap();
+					//converts the str to byte array
+					let buffer: [u8; 32] =  hex::FromHex::from_hex(&accountstr).unwrap();
+					// finally convert to AccountId
+					let accountid=T::AccountId::decode(&mut &buffer[..]).unwrap();
+					// verify account matching between AccountId types
+					if accountid == sender {
+						if othercontractssharevalue >0 {
+							votepercentage=votepercentage+(percentagevalue*othercontractssharevalue/100);
+						}
+					}
+					xx=xx+1;
+				}
 				x=x+1;
 			}
 			// check if the signer has rights to vote >0
