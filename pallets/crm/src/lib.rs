@@ -368,8 +368,8 @@ decl_module! {
 				totpercentage=totpercentage+percentagevalue;
 				x=x+1;
 			}
-			// check the total percentage is = 100
-			ensure!(totpercentage == 100, Error::<T>::WrongTotalPercentageMaster); 
+			// check the total percentage is = 100 TODO
+			//ensure!(totpercentage == 100, Error::<T>::WrongTotalPercentageMaster); 
 
 			// check validity of composition data
 			let compositionclone=composition.clone();
@@ -406,12 +406,12 @@ decl_module! {
 				totpercentage=totpercentage+percentagevalue;
 				x=x+1;
 			}
-			// check the total percentage is = 100
-			ensure!(totpercentage == 100, Error::<T>::WrongTotalPercentageComposition); 
+			// check the total percentage is = 100 (TODO)
+			//ensure!(totpercentage == 100, Error::<T>::WrongTotalPercentageComposition); 
 
 
 			// Other contracts are optional we check the validity if there is a value only
-			if othercontracts.len()>0 {
+			if othercontracts.len()>10 {
 				// check validity of othercontracts data
 				let othercontractsclone=othercontracts.clone();
 				// check for a valid json
