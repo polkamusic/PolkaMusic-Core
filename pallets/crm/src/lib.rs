@@ -52,12 +52,24 @@ decl_storage! {
 		CrmDataChangeVotingResult get(fn get_crmdata_change_voting_result): map hasher(blake2_128_concat) u32  => Option<Voting>;
 		// Votes casted for the contract main data change proposals
 		CrmDataChangeVoteCasted get(fn get_crmdata_change_vote_casted): double_map hasher(blake2_128_concat) T::AccountId, hasher(blake2_128_concat) u32 => Option<bool>;
-		// Change proposal queue for Crm Data
+		// Change proposal queue for Crm Master Data
 		CrmMasterDataChangeProposal get(fn get_crm_masterdata_change_proposal): map hasher(blake2_128_concat) u32 => Option<Vec<u8>>;
 		// Voting counters for the change proposals
 		CrmMasterDataChangeVotingResult get(fn get_crm_masterdata_change_voting_result): map hasher(blake2_128_concat) u32  => Option<Voting>;
 		// Votes casted for the change proposals
 		CrmMasterDataChangeVoteCasted get(fn get_crm_masterdata_change_vote_casted): double_map hasher(blake2_128_concat) T::AccountId, hasher(blake2_128_concat) u32 => Option<bool>;
+		// Change proposal queue for Crm composition Data
+		CrmCompositionDataChangeProposal get(fn get_crm_compositiondata_change_proposal): map hasher(blake2_128_concat) u32 => Option<Vec<u8>>;
+		// Voting counters for the change proposals of composition data
+		CrmCompositionDataChangeVotingResult get(fn get_crm_compositiondata_change_voting_result): map hasher(blake2_128_concat) u32  => Option<Voting>;
+		// Votes casted for the change proposals of composition data
+		CrmCompositionDataChangeVoteCasted get(fn get_crm_compositiondata_change_vote_casted): double_map hasher(blake2_128_concat) T::AccountId, hasher(blake2_128_concat) u32 => Option<bool>;
+		// Change proposal queue for Crm Other Contracts Data
+		CrmOtherContractsDataChangeProposal get(fn get_crm_othercontractsdata_change_proposal): map hasher(blake2_128_concat) u32 => Option<Vec<u8>>;
+		// Voting counters for the change proposals of Other Contracts data
+		CrmOtherContractsDataChangeVotingResult get(fn get_crm_othercontractsdata_change_voting_result): map hasher(blake2_128_concat) u32  => Option<Voting>;
+		// Votes casted for the change proposals of Other Contracts data
+		CrmOtherContractsDataChangeVoteCasted get(fn get_crm_othercontractsdata_change_vote_casted): double_map hasher(blake2_128_concat) T::AccountId, hasher(blake2_128_concat) u32 => Option<bool>;
 	}
 }
 
@@ -72,8 +84,14 @@ decl_event!(
 		CrmCompositionChanged(AccountId, u32),		// Crm composition data has been changed
 		CrmOtherContractsChanged(AccountId,Vec<u8>),// Crm other contracts data has been changed
 		CrmMasterDataNewChangeProposal(AccountId, u32),	// A proposal change for master data has been submitted
-		CrmMasterDataChangeVote(AccountId, u32),		// A vote for a crm data change proposal has been received
-		CrmMasterDataChanged(AccountId, u32),			// Crm data has been changed
+		CrmMasterDataChangeVote(AccountId, u32),		// A vote for a crm master data change proposal has been received
+		CrmMasterDataChanged(AccountId, u32),			// Crm master data has been changed
+		CrmCompositionDataNewChangeProposal(AccountId, u32),// A proposal change for composition data has been submitted
+		CrmCompositionDataChangeVote(AccountId, u32),		// A vote for a crm composition data change proposal has been received
+		CrmCompositionDataChanged(AccountId, u32),			// Crm composition data has been changed
+		CrmOtherContractsDataNewChangeProposal(AccountId, u32),// A proposal change for Other Contracts data has been submitted
+		CrmOtherContractsDataChangeVote(AccountId, u32),	   // A vote for a crm Other Contracts data change proposal has been received
+		CrmOtherContractsDataChanged(AccountId, u32),		   // Crm Other Contracts data has been changed
 	}
 );
 
@@ -1166,7 +1184,441 @@ decl_module! {
 			// returns back with no errors
 			Ok(())
 		}
-
+		/// Submit a change proposal for CRM composition data that must be approved by voting from composition members only
+		#[weight = 50_000]
+		pub fn change_proposal_crm_compositiondata(origin, changeid: u32, compositiondata: Vec<u8>) -> dispatch::DispatchResult {
+			// Check that the extrinsic is signed and get the signer.
+			let sender = ensure_signed(origin)?;
+			// check that at the least some data to change has been received and it's not too long
+			ensure!(compositiondata.len()>0, Error::<T>::MissingContractData); 
+			ensure!(compositiondata.len()<1024, Error::<T>::CrmDataTooLong); 
+			// check the json validity of the proposed CRM composition data	
+			let js=compositiondata.clone();
+			ensure!(json_check_validity(js),Error::<T>::InvalidJson);
+			// check crmid field in json
+			let jscm=compositiondata.clone();
+			let crmidjs=json_get_value(jscm,"crmid".as_bytes().to_vec());
+			let crmid_slice=crmidjs.as_slice();
+            let crmid_str=match str::from_utf8(&crmid_slice){
+                Ok(f) => f,
+                Err(_) => "0"
+            };
+            let crmid:u32 = match u32::from_str(crmid_str){
+                Ok(f) => f,
+                Err(_) => 0,
+            };
+			// check the contract id (crmid field in json), IS on chain on both storage, main and composition data
+			ensure!(CrmCompositionData::contains_key(&crmid)==true, Error::<T>::InvalidContractId);
+			ensure!(CrmData::contains_key(&crmid)==true, Error::<T>::InvalidContractId);
+			// check the changeid is NOT on chain
+			ensure!(CrmCompositionDataChangeProposal::contains_key(changeid.clone())==false, Error::<T>::ChangeIdDuplicated);
+			// get the quorum for composition data from main contractid
+			let crmdata=CrmData::get(&crmid).unwrap();
+			let currentquorumj=json_get_value(crmdata,"compositionquorum".as_bytes().to_vec());
+			let currentquorum_slice=currentquorumj.as_slice();
+            let currentquorum_str=match str::from_utf8(&currentquorum_slice){
+                Ok(f) => f,
+                Err(_) => "100"
+            };
+            let currentquorum:u32 = match u32::from_str(currentquorum_str){
+                Ok(f) => f,
+                Err(_) => 100,
+            };
+			ensure!(currentquorum >0, Error::<T>::InvalidCompositionQuorum);
+			ensure!(currentquorum <=100, Error::<T>::InvalidCompositionQuorum);
+			// check validity of composition data
+			let compositionclone=compositiondata.clone();
+			// check for a valid json
+			ensure!(json_check_validity(compositionclone),Error::<T>::InvalidJson);
+			let mut x=0;
+			let mut totpercentage:u32 = 0;
+			// check validity of records for Composition Data
+			loop {
+				let jr=json_get_recordvalue(compositiondata.clone(),x);
+				if jr.len()==0 {
+					break;
+				}
+				// check for nickname
+				let nickname=json_get_value(jr.clone(),"nickname".as_bytes().to_vec());
+				ensure!(nickname.len() >0, Error::<T>::MissingCompositionNickname); 
+				// check for account address
+				let account=json_get_value(jr.clone(),"account".as_bytes().to_vec());
+				ensure!(account.len() >0, Error::<T>::MissingCompositionAccount);
+				// check for percentage
+				let percentage=json_get_value(jr.clone(),"percentage".as_bytes().to_vec());
+				ensure!(percentage.len() >0, Error::<T>::MissingCompositionPercentage);
+				// convert percentage from vec to u32
+				let percentage_slice=percentage.as_slice();
+            	let percentage_str=match str::from_utf8(&percentage_slice){
+                	Ok(f) => f,
+                	Err(_) => "0"
+            	};
+            	let percentagevalue:u32 = match u32::from_str(percentage_str){
+                	Ok(f) => f,
+                	Err(_) => 0,
+            	};
+				ensure!(percentagevalue >0, Error::<T>::MissingCompositionPercentage);
+				// sum percentage to totpercentage
+				totpercentage=totpercentage+percentagevalue;
+				x=x+1;
+			}
+			// check the total percentage is = 100 TODO
+			ensure!(totpercentage == 100, Error::<T>::WrongTotalPercentageComposition); 	
+			
+			// store the proposal data in the queue.
+			CrmCompositionDataChangeProposal::insert(changeid.clone(), compositiondata.clone());
+			// store initial voting results with current quorum required to change the data
+			let v= Voting {
+				changeid: changeid.clone(),
+				crmid: crmid.clone(),
+				quorum: currentquorum,
+				nrvotesyes: 0,
+				nrvotesno: 0,
+				percvotesyes: 0,
+				percvotesno: 0,
+			};
+			CrmCompositionDataChangeVotingResult::insert(changeid.clone(),v);
+			// Emit an event
+			Self::deposit_event(RawEvent::CrmCompositionDataNewChangeProposal(sender,crmid));
+			Ok(())
+		}
+		/// Vote a change proposal for CRM composition data 
+		#[weight = 10_000]
+		pub fn vote_proposal_crm_compositiondata(origin, changeid: u32, vote: bool) -> dispatch::DispatchResult {
+			// Check that the extrinsic is signed and get the signer.
+			let sender = ensure_signed(origin)?;
+			// check changeid
+			ensure!(changeid > 0, Error::<T>::ChangeIdTooShort); //check minimum length
+			// check the changeid change proposal is on chain
+			ensure!(CrmCompositionDataChangeProposal::contains_key(changeid.clone())==true, Error::<T>::ChangeIdNotFound);	
+			// check for double voting
+			ensure!(CrmCompositionDataChangeVoteCasted::<T>::contains_key(&sender,changeid.clone())==false, Error::<T>::VoteCastedAlready);
+			// get crmid from the change proposal
+			let jsc=CrmCompositionDataChangeProposal::get(&changeid).unwrap();
+			let crmidj=json_get_value(jsc,"crmid".as_bytes().to_vec());
+			let crmid_slice=crmidj.as_slice();
+            let crmid_str=match str::from_utf8(&crmid_slice){
+                Ok(f) => f,
+                Err(_) => "0"
+            };
+            let crmid:u32 = match u32::from_str(crmid_str){
+                Ok(f) => f,
+                Err(_) => 0,
+            };
+			// check the contract id is on chain
+			ensure!(CrmCompositionData::contains_key(&crmid)==true, Error::<T>::InvalidContractId);
+			// check if the signer is one of the composition Accounts
+			let compositiondata=CrmCompositionData::get(crmid.clone()).unwrap_or_default();
+			let mut x=0;
+			let mut votepercentage=0;
+			loop {
+				let jr=json_get_recordvalue(compositiondata.clone(),x);
+				if jr.len()==0 {
+					break;
+				}
+				let account=json_get_value(jr.clone(),"account".as_bytes().to_vec());
+				ensure!(account.len() >0, Error::<T>::MissingCompositionAccount);
+				// check for percentage
+				let percentage=json_get_value(jr.clone(),"percentage".as_bytes().to_vec());
+				ensure!(percentage.len() >0, Error::<T>::MissingCompositionPercentage);
+				// convert percentage from vec to u32
+				let percentage_slice=percentage.as_slice();
+            	let percentage_str=match str::from_utf8(&percentage_slice){
+                	Ok(f) => f,
+                	Err(_) => "0"
+            	};
+            	let percentagevalue:u32 = match u32::from_str(percentage_str){
+                	Ok(f) => f,
+                	Err(_) => 0,
+            	};
+				// convert Account Vec<u8> to AccountId formatm first in str
+				let account_slice=account.as_slice();
+				let accountstr: &str =  str::from_utf8(&account_slice[3..]).unwrap_or_default();
+				//converts the str to byte array
+				let buffer: [u8; 32] =  hex::FromHex::from_hex(&accountstr).unwrap_or_default();
+				// finally convert to AccountId
+				let accountid=T::AccountId::decode(&mut &buffer[..]).unwrap_or_default();
+				// verify account matching between AccountId types
+				if accountid==sender{
+					votepercentage=votepercentage+percentagevalue;
+				}
+				x=x+1;
+			}
+			// check if the signer has rights to vote >0
+			ensure!(votepercentage > 0, Error::<T>::SignerHasNoRightsForVoting); 
+			// store the vote
+			let mut v:Voting=CrmCompositionDataChangeVotingResult::get(changeid.clone()).unwrap_or_default();	
+			let currentpervotesyes=v.percvotesyes;
+			// update the voting structure
+			if vote==true {
+				v.nrvotesyes=v.nrvotesyes+1;
+				v.percvotesyes=v.percvotesyes+votepercentage;
+			}else {
+				v.nrvotesno=v.nrvotesno+1;
+				v.percvotesno=v.percvotesno+votepercentage;
+			}
+			// Printing on the console the voting session status
+			debug::info!("[DEBUG] Voting Session - v.quorum:{} v.nrvotesyes:{} v.nrvotesno:{} v.percvotesyes:{} v.percvotesno:{}",v.quorum,v.nrvotesyes,v.nrvotesno,v.percvotesyes,v.percvotesno);
+			//update the storage with voting results
+			CrmCompositionDataChangeVotingResult::remove(changeid.clone());
+			CrmCompositionDataChangeVotingResult::insert(changeid.clone(),v.clone());
+			// store the vote for the account id
+			CrmCompositionDataChangeVoteCasted::<T>::insert(sender.clone(),changeid.clone(),vote);
+			// Emit an event to alert the user of the vote received
+			//debug::info!("[DEBUG] Emit Event for Vote");
+			Self::deposit_event(RawEvent::CrmCompositionDataChangeVote(sender.clone(),crmid.clone()));
+			// if quorum has been reached, we replace the current CRM data with the one voted from the majority
+			if v.percvotesyes>=v.quorum && v.quorum>currentpervotesyes {
+				let crmdata=CrmCompositionDataChangeProposal::get(changeid.clone()).unwrap();
+				CrmCompositionData::remove(crmid.clone());
+				CrmCompositionData::insert(crmid.clone(), crmdata.clone());
+				// Emit an event to alert the user of the crm data change done
+				Self::deposit_event(RawEvent::CrmCompositionDataChanged(sender,crmid));
+			}
+			// returns back with no errors
+			Ok(())
+		}
+		/// Submit a change proposal for CRM Other Contracts data that must be approved by voting from master members only of the other contracts.
+		#[weight = 50_000]
+		pub fn change_proposal_crm_othercontractsdata(origin, changeid: u32, othercontractsdata: Vec<u8>) -> dispatch::DispatchResult {
+			// Check that the extrinsic is signed and get the signer.
+			let sender = ensure_signed(origin)?;
+			// check that at the least some data to change has been received and it's not too long
+			ensure!(othercontractsdata.len()>0, Error::<T>::MissingContractData); 
+			ensure!(othercontractsdata.len()<1024, Error::<T>::CrmDataTooLong); 
+			// check the json validity of the proposed CRM composition data	
+			let js=othercontractsdata.clone();
+			ensure!(json_check_validity(js),Error::<T>::InvalidJson);
+			// check crmid field in json
+			let jscm=othercontractsdata.clone();
+			let crmidjs=json_get_value(jscm,"crmid".as_bytes().to_vec());
+			let crmid_slice=crmidjs.as_slice();
+            let crmid_str=match str::from_utf8(&crmid_slice){
+                Ok(f) => f,
+                Err(_) => "0"
+            };
+            let crmid:u32 = match u32::from_str(crmid_str){
+                Ok(f) => f,
+                Err(_) => 0,
+            };
+			// check the contract id (crmid field in json), IS on chain on both storage, main and composition data
+			ensure!(CrmOtherContractsData::contains_key(&crmid)==true, Error::<T>::InvalidContractId);
+			ensure!(CrmData::contains_key(&crmid)==true, Error::<T>::InvalidContractId);
+			// check the changeid is NOT on chain
+			ensure!(CrmOtherContractsDataChangeProposal::contains_key(changeid.clone())==false, Error::<T>::ChangeIdDuplicated);
+			// get the quorum for other contracts data from main contractid
+			let crmdata=CrmData::get(&crmid).unwrap();
+			let currentquorumj=json_get_value(crmdata,"othercontractsquorum".as_bytes().to_vec());
+			let currentquorum_slice=currentquorumj.as_slice();
+            let currentquorum_str=match str::from_utf8(&currentquorum_slice){
+                Ok(f) => f,
+                Err(_) => "100"
+            };
+            let currentquorum:u32 = match u32::from_str(currentquorum_str){
+                Ok(f) => f,
+                Err(_) => 100,
+            };
+			ensure!(currentquorum >0, Error::<T>::InvalidOtherContractsQuorum);
+			ensure!(currentquorum <=100, Error::<T>::InvalidOtherContractsQuorum);
+			// check validity of othercontracts data
+			let othercontractsclone=othercontractsdata.clone();
+			// check for a valid json
+			ensure!(json_check_validity(othercontractsclone),Error::<T>::InvalidJson);
+			let mut x=0;
+			let mut totpercentage= 0;
+			// check validity of records for other contracts data
+			loop {
+				let jr=json_get_recordvalue(othercontractsdata.clone(),x);
+				if jr.len()==0 {
+					break;
+				}
+				// check for id
+				let id=json_get_value(jr.clone(),"id".as_bytes().to_vec());
+				ensure!(id.len() >0, Error::<T>::MissingOtherContractsId); 
+				// convert id from vec to u32
+				let id_slice=id.as_slice();
+				let id_str=match str::from_utf8(&id_slice){
+					Ok(f) => f,
+					Err(_) => "0"
+				};
+				let idvalue:u32 = match u32::from_str(id_str){
+					Ok(f) => f,
+					Err(_) => 0,
+				};
+				// check that the id is on chain
+				ensure!(CrmData::contains_key(&idvalue)==true, Error::<T>::InvalidContractId);					
+				// check for percentage
+				let percentage=json_get_value(jr.clone(),"percentage".as_bytes().to_vec());
+				ensure!(percentage.len() >0, Error::<T>::MissingOtherContractsPercentage);
+				// convert percentage from vec to u32
+				let percentage_slice=percentage.as_slice();
+				let percentage_str=match str::from_utf8(&percentage_slice){
+					Ok(f) => f,
+					Err(_) => "0"
+				};
+				let percentagevalue:u32 = match u32::from_str(percentage_str){
+					Ok(f) => f,
+					Err(_) => 0,
+				};
+				ensure!(percentagevalue >0, Error::<T>::MissingOtherContractsPercentage);
+				// sum percentage to totpercentage
+				totpercentage=totpercentage+percentagevalue;
+				x=x+1;
+			}
+			// check the total percentage is = 100
+			ensure!(totpercentage == 100, Error::<T>::WrongTotalPercentageOtherContracts);  	
+			
+			// store the proposal data in the queue.
+			CrmOtherContractsDataChangeProposal::insert(changeid.clone(), othercontractsdata.clone());
+			// store initial voting results with current quorum required to change the data
+			let v= Voting {
+				changeid: changeid.clone(),
+				crmid: crmid.clone(),
+				quorum: currentquorum,
+				nrvotesyes: 0,
+				nrvotesno: 0,
+				percvotesyes: 0,
+				percvotesno: 0,
+			};
+			CrmOtherContractsDataChangeVotingResult::insert(changeid.clone(),v);
+			// Emit an event
+			Self::deposit_event(RawEvent::CrmOtherContractsDataNewChangeProposal(sender,crmid));
+			Ok(())
+		}
+		/// Vote a change proposal for CRM data 
+		#[weight = 10_000]
+		pub fn vote_proposal_crm_othercontractsdata(origin, changeid: u32, vote: bool) -> dispatch::DispatchResult {
+			// Check that the extrinsic is signed and get the signer.
+			let sender = ensure_signed(origin)?;
+			// check changeid
+			ensure!(changeid > 0, Error::<T>::ChangeIdTooShort); //check minimum length
+			// check the changeid change proposal is on chain
+			ensure!(CrmOtherContractsDataChangeProposal::contains_key(changeid.clone())==true, Error::<T>::ChangeIdNotFound);	
+			// check for double voting
+			ensure!(CrmOtherContractsDataChangeVoteCasted::<T>::contains_key(&sender,changeid.clone())==false, Error::<T>::VoteCastedAlready);
+			// get crmid from the change proposal
+			let jsc=CrmOtherContractsDataChangeProposal::get(&changeid).unwrap();
+			let crmidj=json_get_value(jsc,"crmid".as_bytes().to_vec());
+			let crmid_slice=crmidj.as_slice();
+            let crmid_str=match str::from_utf8(&crmid_slice){
+                Ok(f) => f,
+                Err(_) => "0"
+            };
+            let crmid:u32 = match u32::from_str(crmid_str){
+                Ok(f) => f,
+                Err(_) => 0,
+            };
+			// check the contract id is on chain
+			ensure!(CrmData::contains_key(&crmid)==true, Error::<T>::InvalidContractId);
+			// check if the signer is part of any "other contract"
+			let othercontractsdata=CrmOtherContractsData::get(crmid.clone()).unwrap_or_default();
+			let mut votepercentage=0;
+			if othercontractsdata.len()>10{
+				let mut x=0;
+				loop {
+					let jr=json_get_recordvalue(othercontractsdata.clone(),x);
+					if jr.len()==0 {
+						break;
+					}
+					let id=json_get_value(jr.clone(),"id".as_bytes().to_vec());
+					ensure!(id.len() >0, Error::<T>::InvalidContractIdVoting);
+					let id_slice=id.as_slice();
+            		let id_str=match str::from_utf8(&id_slice){
+                		Ok(f) => f,
+                		Err(_) => "0"
+            		};
+            		let idvalue:u32 = match u32::from_str(id_str){
+                		Ok(f) => f,
+                		Err(_) => 0,
+            		};
+					ensure!(idvalue >0, Error::<T>::InvalidContractIdVotingNumeric);
+					// check for percentage
+					let percentage=json_get_value(jr.clone(),"percentage".as_bytes().to_vec());
+					ensure!(percentage.len() >0, Error::<T>::MissingOtherContractsPercentage);
+					// convert percentage from vec to u32
+					let percentage_slice=percentage.as_slice();
+            		let percentage_str=match str::from_utf8(&percentage_slice){
+                		Ok(f) => f,
+                		Err(_) => "0"
+            		};
+            		let percentagevalue:u32 = match u32::from_str(percentage_str){
+                		Ok(f) => f,
+                		Err(_) => 0,
+            		};
+					ensure!(percentagevalue>0, Error::<T>::MissingOtherContractsPercentage);
+					// check Master record of the other contract
+					let mut xx=0;
+					let masterdata=CrmMasterData::get(idvalue.clone()).unwrap();
+					loop {
+						let jr=json_get_recordvalue(masterdata.clone(),xx);
+						if jr.len()==0 {
+							break;
+						}
+						let account=json_get_value(jr.clone(),"account".as_bytes().to_vec());
+						ensure!(account.len() >0, Error::<T>::MissingMasterAccount);
+						// check for percentage
+						let percentage=json_get_value(jr.clone(),"percentage".as_bytes().to_vec());
+						ensure!(percentage.len() >0, Error::<T>::MissingMasterPercentage);
+					
+						// convert percentage from vec to u32
+						let percentage_slice=percentage.as_slice();
+            			let percentage_str=match str::from_utf8(&percentage_slice){
+                			Ok(f) => f,
+                			Err(_) => "0"
+            			};
+            			let percentagevalue:u32 = match u32::from_str(percentage_str){
+                			Ok(f) => f,
+                			Err(_) => 0,
+            			};
+						// convert Account Vec<u8> to AccountId format, first in str
+						let account_slice=account.as_slice();
+						let accountstr: &str =  str::from_utf8(&account_slice[3..]).unwrap_or_default();
+						//converts the str to byte array
+						let buffer: [u8; 32] =  hex::FromHex::from_hex(&accountstr).unwrap_or_default();
+						// finally convert to AccountId
+						let accountid=T::AccountId::decode(&mut &buffer[..]).unwrap_or_default();
+						// verify account matching between AccountId types
+						if accountid == sender {
+								votepercentage=votepercentage+percentagevalue;
+						}
+						xx=xx+1;
+					}
+					x=x+1;
+				}
+			}
+			// check if the signer has rights to vote >0
+			ensure!(votepercentage > 0, Error::<T>::SignerHasNoRightsForVoting); 
+			// store the vote
+			let mut v:Voting=CrmOtherContractsDataChangeVotingResult::get(changeid.clone()).unwrap_or_default();	
+			let currentpervotesyes=v.percvotesyes;
+			// update the voting structure
+			if vote==true {
+				v.nrvotesyes=v.nrvotesyes+1;
+				v.percvotesyes=v.percvotesyes+votepercentage;
+			}else {
+				v.nrvotesno=v.nrvotesno+1;
+				v.percvotesno=v.percvotesno+votepercentage;
+			}
+			// Printing on the console the voting session status
+			debug::info!("[DEBUG] Voting Session - v.quorum:{} v.nrvotesyes:{} v.nrvotesno:{} v.percvotesyes:{} v.percvotesno:{}",v.quorum,v.nrvotesyes,v.nrvotesno,v.percvotesyes,v.percvotesno);
+			//update the storage with voting results
+			CrmOtherContractsDataChangeVotingResult::remove(changeid.clone());
+			CrmOtherContractsDataChangeVotingResult::insert(changeid.clone(),v.clone());
+			// store the vote for the account id
+			CrmOtherContractsDataChangeVoteCasted::<T>::insert(sender.clone(),changeid.clone(),vote);
+			// Emit an event to alert the user of the vote received
+			Self::deposit_event(RawEvent::CrmOtherContractsDataChangeVote(sender.clone(),crmid.clone()));
+			// if quorum has been reached, we replace the current CRM Other Contracts data with the one voted from the majority
+			if v.percvotesyes>=v.quorum && v.quorum>currentpervotesyes {
+				let crmdata=CrmOtherContractsDataChangeProposal::get(changeid.clone()).unwrap();
+				CrmOtherContractsData::remove(crmid.clone());
+				CrmOtherContractsData::insert(crmid.clone(), crmdata.clone());
+				// Emit an event to alert the user of the crm data change done
+				Self::deposit_event(RawEvent::CrmOtherContractsDataChanged(sender,crmid));
+			}
+			// returns back with no errors
+			Ok(())
+		}
 	}
 }
 // function to validate a json string for no/std. It does not allocate of memory

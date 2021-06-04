@@ -207,29 +207,98 @@ The client libraries like https://polkadot.js.org/docs/ support the conversion e
 
 ### Change Proposal for main CRM data
 
-Once stored, the contract for right management can changed only through a voting process of the member.  
-This functions allow to submit a change proposal from any account. Gas fees are chargded to limit spamming activities.  
-The main data of the contract can be changed with the vote of all the rights owners.  
+Once stored, the contract for right management can be changed only through a voting process of the member.  
+This functions allow to submit a change proposal from any account. Gas fees are charged to mitigate possible spamming.
+The main data of the contract can be changed with the vote of the rights owners once the voting has reached the minimum quorum.
 To submit a change proposal for the main CRM data, there is a specific function:  
-```changeProposalCrmdata(changeid, crmid, crmdata)```  
+```changeProposalCrmdata(changeid, crmdata)```  
 - "changeid" is a unique id (unsigned number 32 bit - u32) to be assigned for the proposalof a specific contract id.  
-Different contract id can have the same change id.  
-The whole key is build from contract id + change id.  
-- "crmid" is the unique id number of an existant contract for right management.  
-- "crmdata" is the new json structure in the same format used for creating the new contract. 
+- "crmdata" is the new json structure in the same format used for creating the new contract + an additional filed "crmid" containing the id of the contract to change. For example: 
+``` 
+{"crmid":1,"ipfshash":"0E7071C59DF3B9454D1D18A15270AA36D54F89606A576DC621757AFD44AD1D2E","ipfshashprivate": "B45165ED3CD437B9FFAD02A2AAD22A4DDC69162470E2622982889CE5826F6E3D","globalquorum":100,"mastershare":60,"masterquorum":51,"compositionshare":40,"compositionquorum":51,"othercontractsshare":0,"othercontractsquorum":51}
+```
+The function generates events that can be intercepted for alterting the parts involved.
 
-The functions generates events that can be intercepted for alterting the parts involved.
-
-### Voting Change Proposal  
+### Voting Change Proposal for Main CRM Data
 
 The change proposal are kept in the queue for voting until they reach the quorum required. The user interface may decide for not showing the proposal after xx blocks.  
 
-```voteProposalCrmdata(changeid, crmid, vote)```  
-- "changeid" is a unique id (unsigned number 32 bit - u32) to be assigned for the proposalof a specific contract id.  
-Different contract id can have the same change id.  
-The whole key is build from contract id + change id.  
-- "crmid" is the unique id number of an existant contract for right management.  
+```voteProposalCrmdata(changeid, vote)```  
+- "changeid" is a unique id (unsigned number 32 bit - u32) to be assigned for the proposal of a specific contract id.  
+Different contract data category like main data,master data, composition data,Other Contracts data)  can use the same change id.  
 - "vote" - is a booelan variable. It can be set to "Yes/True" to approve the proposal or "No/False" to disapprove.  
+
+
+### Change Proposal for Master CRM data
+
+The master data of the contract can be changed with the vote of the rights owners once the voting has reached the minimum quorum.
+To submit a change proposal for the master CRM data, there is a specific function:  
+```changeProposalCrmMasterdata(changeid, crmdata)```  
+- "changeid" is a unique id (unsigned number 32 bit - u32) to be assigned for the proposalof a specific contract id.  
+- "crmdata" is the new json structure in the same format used for creating the new contract + an additional filed "crmid" containing the id of the contract to change. For example: 
+``` 
+{"crmid":1,"master": [{"nickname": "Bob","account": "0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48","percentage":40},{"nickname": "Bob Stash","account": "0xfe65717dad0447d715f660a0a58411de509b42e6efb8375f562f58a554d5860e", "percentage":60}]}
+```
+The function generates events that can be intercepted for alterting the parts involved.
+
+### Voting Change Proposal for Master CRM Data
+
+The change proposals are kept in the queue for voting until they reach the quorum required. The user interface may decide for not showing the proposal after xx blocks.  
+
+```voteProposalCrmMasterdata(changeid, vote)```  
+- "changeid" is a unique id (unsigned number 32 bit - u32) to be assigned for the proposal of a specific contract id.  
+Different contract data category like main data,master data, composition data,Other Contracts data)  can use the same change id.  
+- "vote" - is a booelan variable. It can be set to "Yes/True" to approve the proposal or "No/False" to disapprove.  
+
+
+### Change Proposal for Composition CRM data
+
+The composition data of the contract can be changed with the vote of the rights owners once the voting has reached the minimum quorum.
+To submit a change proposal for the composition CRM data, there is a specific function:  
+```changeProposalCrmCompositiondata(changeid, crmdata)```  
+- "changeid" is a unique id (unsigned number 32 bit - u32) to be assigned for the proposalof a specific contract id.  
+- "crmdata" is the new json structure in the same format used for creating the new contract + an additional filed "crmid" containing the id of the contract to change. For example: 
+``` 
+{"crmid":1,"composition": [{"nickname": "Bob","account": "0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48","percentage":40},{"nickname": "Bob Stash","account": "0xfe65717dad0447d715f660a0a58411de509b42e6efb8375f562f58a554d5860e", "percentage":60}]}
+```
+The function generates events that can be intercepted for alterting the parts involved.
+
+### Voting Change Proposal for Composition CRM Data
+
+The change proposals are kept in the queue for voting until they reach the quorum required. The user interface may decide for not showing the proposal after xx blocks.  
+
+```voteProposalCrmCompositiondata(changeid, vote)```  
+- "changeid" is a unique id (unsigned number 32 bit - u32) to be assigned for the proposal of a specific contract id.  
+Different contract data category like main data,master data, composition data,Other Contracts data)  can use the same change id.  
+- "vote" - is a booelan variable. It can be set to "Yes/True" to approve the proposal or "No/False" to disapprove.  
+
+### Change Proposal for Other Contracts CRM data
+
+The Other Contracts data of the contract can be changed with the vote of the rights owners once the voting has reached the minimum quorum.
+To submit a change proposal for the Other Contracts CRM data, there is a specific function:  
+```changeProposalCrmOtherContractsdata(changeid, crmdata)```  
+- "changeid" is a unique id (unsigned number 32 bit - u32) to be assigned for the proposalof a specific contract id.  
+- "crmdata" is the new json structure in the same format used for creating the new contract + an additional filed "crmid" containing the id of the contract to change. For example: 
+``` 
+{"crmid":1,"othercontracts": [{"id":1,"percentage":70},{"id":2,"percentage":30}]}
+
+```
+The function generates events that can be intercepted for alterting the parts involved.
+
+### Voting Change Proposal for Other Contracts CRM Data
+
+The change proposals are kept in the queue for voting until they reach the quorum required. The user interface may decide for not showing the proposal after xx blocks.  
+
+```voteProposalCrmOtherContractsdata(changeid, vote)```  
+- "changeid" is a unique id (unsigned number 32 bit - u32) to be assigned for the proposal of a specific contract id.  
+Different contract data category like main data,master data, composition data,Other Contracts data)  can use the same change id.  
+- "vote" - is a booelan variable. It can be set to "Yes/True" to approve the proposal or "No/False" to disapprove.  
+
+
+### Queries
+
+You can query the maps stored, to get an updated list you can select "crm" from "Developer","Chain State" from the web interface:  
+https://polkadot.js.org/apps/#/chainstate
 
 
 

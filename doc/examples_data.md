@@ -17,6 +17,10 @@
 ******* Change Proposal of Master data for contract #1
 {"crmid":1,"master": [{"nickname": "Bob","account": "0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48","percentage":40},{"nickname": "Bob Stash","account": "0xfe65717dad0447d715f660a0a58411de509b42e6efb8375f562f58a554d5860e", "percentage":60}]}
 
+****** Change proposal for Other Contracts:
+{"crmid":1,"othercontracts": [{"id":1,"percentage":70},{"id":2,"percentage":30}]}
+
+
 
 ***** Contract #2
 
