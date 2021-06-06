@@ -169,7 +169,7 @@ for example:
 To be noticed that the total of the percentages must be = 100
 for example:  
 ```
-{"master": [{"nickname": "Bob","account": "0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48","percentage": 50},{"nickname": "Bob Stash","account": "0xfe65717dad0447d715f660a0a58411de509b42e6efb8375f562f58a554d5860e","percentage": 50}]}
+{"master": [{"nickname": "Bob","account": "0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48","percentage":50},{"nickname": "Bob Stash","account": "0xfe65717dad0447d715f660a0a58411de509b42e6efb8375f562f58a554d5860e","percentage":50}]}
 ```
 
 - "composition" field should contains a json with the informations regarding the shares for the composition members:
@@ -184,7 +184,7 @@ for example:
 To be noticed that the total of the percentages must be = 100  
 for example:  
 ```
-{"composition": [{"nickname": "Charlie","account": "0x90b5ab205c6974c9ea841be688864633dc9ca8a357843eeacf2314649965fe22","percentage": 50},{"nickname": "Dave","account": "0x306721211d5404bd9da88e0204360a1a9ab8b87c66c1bc2fcdd37f3c2222cc20","percentage": 50}]}
+{"composition": [{"nickname": "Charlie","account": "0x90b5ab205c6974c9ea841be688864633dc9ca8a357843eeacf2314649965fe22","percentage":50},{"nickname": "Dave","account": "0x306721211d5404bd9da88e0204360a1a9ab8b87c66c1bc2fcdd37f3c2222cc20","percentage":50}]}
 ```
 - "othercontracts" field should contains a json with the informations the shares assigned to other contracts, this field is optional:  
 {  
@@ -197,13 +197,15 @@ for example:
 To be noticed that the total of the percentages must be = 100.  
 for example:  
 ```
-{"othercontracts": [{"id": 1,"percentage": 50},{"id": 2,"percentage": 50}]}
+{"othercontracts": [{"id": 1,"percentage":50},{"id": 2,"percentage":50}]}
 ```
 
 The runtime works with hexadecimal accounts, to convert an SS58 account into hex format you can use the following tool:  
 [https://polkadot.subscan.io/tools/ss58_transform(https://polkadot.subscan.io/tools/ss58_transform)]
 
-The client libraries like https://polkadot.js.org/docs/ support the conversion easiliy.
+The client libraries like https://polkadot.js.org/docs/ support the conversion easiliy.  
+  
+- Attenttion - Please don't use space behind numeric value in the json structure or the field be evaluated =0.  
 
 ### Change Proposal for main CRM data
 
