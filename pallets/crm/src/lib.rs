@@ -560,9 +560,9 @@ decl_module! {
 			ensure!(CrmData::contains_key(&crmid)==true, Error::<T>::InvalidContractId);
 			// check the changeid is NOT on chain
 			ensure!(CrmDataChangeProposal::contains_key(changeid.clone())==false, Error::<T>::ChangeIdDuplicated);
-			// get the currentquorum for Master data from main contractid
+			// get the currentquorum for Global data from main contractid
 			let crmdataq=CrmData::get(&crmid).unwrap();
-			let currentquorumj=json_get_value(crmdataq,"masterquorum".as_bytes().to_vec());
+			let currentquorumj=json_get_value(crmdataq,"globalquorum".as_bytes().to_vec());
 			let currentquorum_slice=currentquorumj.as_slice();
             let currentquorum_str=match str::from_utf8(&currentquorum_slice){
                 Ok(f) => f,
