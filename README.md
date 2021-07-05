@@ -154,7 +154,7 @@ The generation of a unique is is external the logic of the blockchain. The funct
 }  
 for example:  
 ```
-{"ipfshash":"0E7071C59DF3B9454D1D18A15270AA36D54F89606A576DC621757AFD44AD1D2E","ipfshashprivate": "B45165ED3CD437B9FFAD02A2AAD22A4DDC69162470E2622982889CE5826F6E3D","globalquorum":100,"mastershare":50,"masterquorum":51,"compositionshare":30,"compositionquorum":51,"othercontractsshare":20,"othercontractsquorum":51}
+{"ipfshash":"0E7071C59DF3B9454D1D18A15270AA36D54F89606A576DC621757AFD44AD1D2E","ipfshashprivate": "B45165ED3CD437B9FFAD02A2AAD22A4DDC69162470E2622982889CE5826F6E3D","globalquorum":100,"mastershare":50,"masterquorum":51,"compositionshare":30,"compositionquorum":51,"othercontractsshare":0,"othercontractsquorum":51}
 ```
 
 - "master" field should contains a json with the informations regarding the shares for the Master(s):
@@ -215,9 +215,9 @@ The main data of the contract can be changed with the vote of the rights owners 
 To submit a change proposal for the main CRM data, there is a specific function:  
 ```changeProposalCrmdata(changeid, crmdata)```  
 - "changeid" is a unique id (unsigned number 32 bit - u32) to be assigned for the proposalof a specific contract id.  
-- "crmdata" is the new json structure in the same format used for creating the new contract + an additional filed "crmid" containing the id of the contract to change. For example: 
+- "crmdata" is the new json structure in the same format used for creating the new contract + an additional field "crmid" containing the id of the contract to change. For example: 
 ``` 
-{"crmid":1,"ipfshash":"0E7071C59DF3B9454D1D18A15270AA36D54F89606A576DC621757AFD44AD1D2E","ipfshashprivate": "B45165ED3CD437B9FFAD02A2AAD22A4DDC69162470E2622982889CE5826F6E3D","globalquorum":100,"mastershare":60,"masterquorum":51,"compositionshare":40,"compositionquorum":51,"othercontractsshare":0,"othercontractsquorum":51}
+{"crmid":1,"ipfshash":"0E7071C59DF3B9454D1D18A15270AA36D54F89606A576DC621757AFD44AD1D2E","ipfshashprivate": "B45165ED3CD437B9FFAD02A2AAD22A4DDC69162470E2622982889CE5826F6E3D","globalquorum":75,"mastershare":60,"masterquorum":51,"compositionshare":40,"compositionquorum":51,"othercontractsshare":0,"othercontractsquorum":51}
 ```
 The function generates events that can be intercepted for alterting the parts involved.
 
