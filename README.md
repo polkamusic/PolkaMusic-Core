@@ -154,7 +154,7 @@ The generation of a unique is is external the logic of the blockchain. The funct
 }  
 for example:  
 ```
-{"ipfshash":"0E7071C59DF3B9454D1D18A15270AA36D54F89606A576DC621757AFD44AD1D2E","ipfshashprivate": "B45165ED3CD437B9FFAD02A2AAD22A4DDC69162470E2622982889CE5826F6E3D","globalquorum":100,"mastershare":50,"masterquorum":51,"compositionshare":30,"compositionquorum":51,"othercontractsshare":0,"othercontractsquorum":51}
+{"ipfshash":"0E7071C59DF3B9454D1D18A15270AA36D54F89606A576DC621757AFD44AD1D2E","ipfshashprivate": "B45165ED3CD437B9FFAD02A2AAD22A4DDC69162470E2622982889CE5826F6E3D","globalquorum":100,"mastershare":50,"masterquorum":51,"compositionshare":50,"compositionquorum":51,"othercontractsshare":0,"othercontractsquorum":51}
 ```
 
 - "master" field should contains a json with the informations regarding the shares for the Master(s):
@@ -197,7 +197,7 @@ for example:
 To be noticed that the total of the percentages must be = 100.  
 for example:  
 ```
-{"othercontracts": [{"id": 1,"percentage":50},{"id": 2,"percentage":50}]}
+{"othercontracts": [{"id":1,"percentage":50},{"id":2,"percentage":50}]}
 ```
 
 The runtime works with hexadecimal accounts, to convert an SS58 account into hex format you can use the following tool:  
@@ -289,7 +289,8 @@ The function generates events that can be intercepted for alterting the parts in
 
 ### Voting Change Proposal for Other Contracts CRM Data
 
-The change proposals are kept in the queue for voting until they reach the quorum required. The user interface may decide for not showing the proposal after xx blocks.  
+The change proposals are kept in the queue for voting until they reach the quorum required. The user interface may decide for not showing the proposal after xx blocks.
+The right of vote to change the other contracts is assigned to the same account stored in Master data.    
 
 ```voteProposalCrmOtherContractsdata(changeid, vote)```  
 - "changeid" is a unique id (unsigned number 32 bit - u32) to be assigned for the proposal of a specific contract id.  

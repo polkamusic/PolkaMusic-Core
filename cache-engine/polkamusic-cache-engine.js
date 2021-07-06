@@ -101,11 +101,51 @@ async function main () {
                 console.log("[INFO] Adding new vote for contract id: ",contractid," Change id (Master Data): ",changeid);
                 add_vote_change_crmmasterdata(connection,api,contractid,changeid);
             }
-            // Changed CRM Data
+            // Changed CRM Master Data
             if (eventv.section=="crm" && eventv.method=="CrmMasterDataChanged"){
                 let contractid=eventv.data[1].toString();
                 console.log("[INFO] Contract master data has changed: ",contractid);
                 change_crmmasterdata(connection,api,contractid);
+            }
+            // Change proposal for Crm Composition Data
+            if (eventv.section=="crm" && eventv.method=="CrmCompositionDataNewChangeProposal"){
+                let contractid=eventv.data[1].toString();
+                let changeid=eventv.data[2].toString();
+                console.log("[INFO] Adding new change proposal for crm composition data",contractid," Change id: ",changeid);
+                add_change_proposal_crmcompositiondata(connection,api,contractid,changeid);
+            }            
+            // Vote for change Crm Composition Data
+            if (eventv.section=="crm" && eventv.method=="CrmCompositionDataChangeVote"){
+                let contractid=eventv.data[1].toString();
+                let changeid=eventv.data[2].toString();
+                console.log("[INFO] Adding new vote for contract id: ",contractid," Change id (Composition Data): ",changeid);
+                add_vote_change_crmcompositiondata(connection,api,contractid,changeid);
+            }
+            // Changed CRM Composition Data
+            if (eventv.section=="crm" && eventv.method=="CrmCompositionDataChanged"){
+                let contractid=eventv.data[1].toString();
+                console.log("[INFO] Contract composition data has changed: ",contractid);
+                change_crmcompositiondata(connection,api,contractid);
+            }
+            // Change proposal for Crm Other Contracts Data
+            if (eventv.section=="crm" && eventv.method=="CrmOtherContractsDataNewChangeProposal"){
+                let contractid=eventv.data[1].toString();
+                let changeid=eventv.data[2].toString();
+                console.log("[INFO] Adding new change proposal for crm other contracts data",contractid," Change id: ",changeid);
+                add_change_proposal_crmothercontractsdata(connection,api,contractid,changeid);
+            }            
+            // Vote for change Crm Other Contracts Data
+            if (eventv.section=="crm" && eventv.method=="CrmOthercontractsDataChangeVote"){
+                let contractid=eventv.data[1].toString();
+                let changeid=eventv.data[2].toString();
+                console.log("[INFO] Adding new vote for contract id: ",contractid," Change id (Other contracts Data): ",changeid);
+                add_vote_change_crmothercontractsdata(connection,api,contractid,changeid);
+            }
+            // Changed CRM Other Contracts Data
+            if (eventv.section=="crm" && eventv.method=="CrmOtherContractsDataChanged"){
+                let contractid=eventv.data[1].toString();
+                console.log("[INFO] Contract other contracts data has changed: ",contractid);
+                change_crmothercontractsdata(connection,api,contractid);
             }
             // Loop through each of the parameters, displaying the type and data
             eventv.data.forEach((data, index) => {
@@ -119,19 +159,19 @@ main().catch((error) => {
 console.log("[INFO] Dropping empty/null data")
 console.error(error);
 });
-// function to add change proposal for  crm master data
-async function add_change_proposal_crmmasterdata(connection,api,contractid,changeid){
+// function to add change proposal for  crm compisition data
+async function add_change_proposal_crmcompositiondata(connection,api,contractid,changeid){
     //query change proposal data
-    const crmmasterdata = await api.query.crm.crmMasterDataChangeProposal(contractid);
-    const crmmd = Buffer.from(crmmasterdata.toString().substr(2), 'hex');
-    const jmd=JSON.parse(crmd);
+    const crmcompositiondata = await api.query.crm.crmCompositionDataChangeProposal(changeid);
+    const crmcd = Buffer.from(crmcompositiondata.toString().substr(2), 'hex');
+    const jmd=JSON.parse(crmcd);
     // write record
-    jmd.master.forEach(element => {
-        let sqlquery="insert into polkamusic.crmmasterdatachangeproposal set contractid=?,changeid=?,nickname=?,account=?,percentage=?";
+    jmd.composition.forEach(element => {
+        let sqlquery="insert into polkamusic.crmcompositiondatachangeproposal set changeid=?,contractid=?,nickname=?,account=?,percentage=?";
         connection.query(
             {
                 sql: sqlquery,
-                values: [contractid,changeid,element.nickname,element.account,element.percentage]
+                values: [changeid,contractid,element.nickname,element.account,element.percentage]
             },
             function (error) {
                 if (error){
@@ -142,10 +182,10 @@ async function add_change_proposal_crmmasterdata(connection,api,contractid,chang
         );
     });
     //query voting results for change proposal
-    const crmdatav = await api.query.crm.crmMasterDataChangeVotingResult(changeid);
+    const crmdatav = await api.query.crm.crmCompositionDataChangeVotingResult(changeid);
     let jdv=crmdatav.unwrap();
     // write record
-    let sqlquery1="insert into polkamusic.crmamsterdatachangevotingresult set changeid=?,contractid=?,quorum=?,nrvotesyes=?,nrvotesno=?,percvotesyes=?,percvotesno=?";
+    let sqlquery1="insert into polkamusic.crmcompositiondatachangevotingresult set changeid=?,contractid=?,quorum=?,nrvotesyes=?,nrvotesno=?,percvotesyes=?,percvotesno=?";
     connection.query(
         {
             sql: sqlquery1,
@@ -160,6 +200,200 @@ async function add_change_proposal_crmmasterdata(connection,api,contractid,chang
     );
     
 }
+// function to add vote for the change proposal of crm composiiton data
+async function add_vote_change_crmcompositiondata(connection,api,contractid,changeid){
+    //query voting results for change proposal
+    const crmdata = await api.query.crm.crmCompositionDataChangeVotingResult(changeid);
+    let jd=crmdata.unwrap();
+    // write record
+    let sqlquery="update polkamusic.crmcompositiondatachangevotingresult set nrvotesyes=?,nrvotesno=?,percvotesyes=?,percvotesno=? where changeid=? and contractid=?";
+    connection.query(
+        {
+            sql: sqlquery,
+            values: [jd.nrvotesyes.toNumber(),jd.nrvotesno.toNumber(),jd.percvotesyes.toNumber(),jd.percvotesno.toNumber(),changeid,contractid]
+        },
+        function (error) {
+            if (error){
+                    throw error;
+            }
+        }
+    );
+}
+// function to change crm master data
+async function change_crmcompositiondata(connection,api,contractid){
+    // delete previous records
+    let sqlqueryd="delete from polkamusic.crmcompositiondata where contractid=?";
+    connection.query(
+        {
+            sql: sqlqueryd,
+            values: [contractid]
+        },
+        async function (error) {
+            if (error){
+                throw error;    
+            }else {
+                //query change proposal data
+                const crmdata = await api.query.crm.crmMasterData(contractid);
+                const crmd = Buffer.from(crmdata.toString().substr(2), 'hex');
+                const jmd=JSON.parse(crmd);
+                // write new records
+                jmd.master.forEach(element => {
+                    let sqlquery="insert into polkamusic.crmcompositiondata set contractid=?,nickname=?,account=?,percentage=?";
+                    connection.query(
+                        {
+                            sql: sqlquery,
+                            values: [contractid,element.nickname,element.account,element.percentage]
+                        },
+                        function (error) {
+                            if (error){
+                                if (error.errno!=1062)      //duplicated record is ignored, because it happens in refreshing the cache
+                                    throw error;
+                            }
+                        }
+                    );
+                });
+            }
+        }
+    );
+}
+// function to add change proposal for  crm other contracts data
+async function add_change_proposal_crmothercontractsdata(connection,api,contractid,changeid){
+    //query change proposal data
+    const crmdata = await api.query.crm.crmOtherContractsDataChangeProposal(changeid);
+    const crmcd = Buffer.from(crmdata.toString().substr(2), 'hex');
+    const jmd=JSON.parse(crmcd);
+    // write record
+    jmd.othercontracts.forEach(element => {
+        let sqlquery="insert into polkamusic.crmothercontractsdatachangeproposal set changeid=?,contractid=?,othercontractid=?,percentage=?";
+        connection.query(
+            {
+                sql: sqlquery,
+                values: [changeid,contractid,element.id,element.percentage]
+            },
+            function (error) {
+                if (error){
+                    if (error.errno!=1062)      //duplicated record is ignored, because it happens in refreshing the cache
+                        throw error;
+                }
+            }
+        );
+    });
+    //query voting results for change proposal
+    const crmdatav = await api.query.crm.crmOtherContractsDataChangeVotingResult(changeid);
+    let jdv=crmdatav.unwrap();
+    // write record
+    let sqlquery1="insert into polkamusic.crmothercontractsdatachangevotingresult set changeid=?,contractid=?,quorum=?,nrvotesyes=?,nrvotesno=?,percvotesyes=?,percvotesno=?";
+    connection.query(
+        {
+            sql: sqlquery1,
+            values: [changeid,contractid,jdv.quorum.toNumber(),jdv.nrvotesyes.toNumber(),jdv.nrvotesno.toNumber(),jdv.percvotesyes.toNumber(),jdv.percvotesno.toNumber()]
+        },
+        function (error) {
+            if (error){
+                if (error.errno!=1062)      //duplicated record is ignored, because it happens in refreshing the cache
+                    throw error;
+            }
+        }
+    );
+    
+}
+// function to add vote for the change proposal of crm composiiton data
+async function add_vote_change_crmothercontractsdata(connection,api,contractid,changeid){
+    //query voting results for change proposal
+    const crmdata = await api.query.crm.crmOtherContractsDataChangeVotingResult(changeid);
+    let jd=crmdata.unwrap();
+    // write record
+    let sqlquery="update polkamusic.crmothercontractsdatachangevotingresult set nrvotesyes=?,nrvotesno=?,percvotesyes=?,percvotesno=? where changeid=? and contractid=?";
+    connection.query(
+        {
+            sql: sqlquery,
+            values: [jd.nrvotesyes.toNumber(),jd.nrvotesno.toNumber(),jd.percvotesyes.toNumber(),jd.percvotesno.toNumber(),changeid,contractid]
+        },
+        function (error) {
+            if (error){
+                    throw error;
+            }
+        }
+    );
+}
+// function to change crm other contractts data
+async function change_crmothercontractsdata(connection,api,contractid){
+    // delete previous records
+    let sqlqueryd="delete from polkamusic.crmothercontractsdata where contractid=?";
+    connection.query(
+        {
+            sql: sqlqueryd,
+            values: [contractid]
+        },
+        async function (error) {
+            if (error){
+                throw error;    
+            }else {
+                //query change proposal data
+                const crmdata = await api.query.crm.crmOtherContractsData(contractid);
+                const crmd = Buffer.from(crmdata.toString().substr(2), 'hex');
+                const jmd=JSON.parse(crmd);
+                // write new records
+                jmd.othercontracts.forEach(element => {
+                    let sqlquery="insert into polkamusic.crmothercontractsdata set contractid=?,othercontractid=?,percentage=?";
+                    connection.query(
+                        {
+                            sql: sqlquery,
+                            values: [contractid,element.id,element.percentage]
+                        },
+                        function (error) {
+                            if (error){
+                                if (error.errno!=1062)      //duplicated record is ignored, because it happens in refreshing the cache
+                                    throw error;
+                            }
+                        }
+                    );
+                });
+            }
+        }
+    );
+}
+// function to add change proposal for crm master data
+async function add_change_proposal_crmmasterdata(connection,api,contractid,changeid){
+    //query change proposal data
+    const crmmasterdata = await api.query.crm.crmMasterDataChangeProposal(changeid);
+    const crmd = Buffer.from(crmmasterdata.toString().substr(2), 'hex');
+    const jmd=JSON.parse(crmd);
+    // write record
+    jmd.master.forEach(element => {
+        connection.query(
+            {
+                sql: "insert into polkamusic.crmmasterdatachangeproposal set changeid=?,contractid=?,nickname=?,account=?,percentage=?",
+                values: [changeid,contractid,element.nickname,element.account,element.percentage]
+            },
+            function (error) {
+                if (error){
+                    if (error.errno!=1062)      //duplicated record is ignored, because it happens in refreshing the cache
+                        throw error;
+                }
+            }
+        );
+    });
+    //query voting results for change proposal
+    const crmdatav = await api.query.crm.crmMasterDataChangeVotingResult(changeid);
+    let jdv=crmdatav.unwrap();
+    // write record
+    let sqlquery1="insert into polkamusic.crmmasterdatachangevotingresult set changeid=?,contractid=?,quorum=?,nrvotesyes=?,nrvotesno=?,percvotesyes=?,percvotesno=?";
+    connection.query(
+        {
+            sql: sqlquery1,
+            values: [changeid,contractid,jdv.quorum.toNumber(),jdv.nrvotesyes.toNumber(),jdv.nrvotesno.toNumber(),jdv.percvotesyes.toNumber(),jdv.percvotesno.toNumber()]
+        },
+        function (error) {
+            if (error){
+                if (error.errno!=1062)      //duplicated record is ignored, because it happens in refreshing the cache
+                    throw error;
+            }
+        }
+    );
+    
+}
+
 // function to add vote for the change proposal of crm data
 async function add_vote_change_crmmasterdata(connection,api,contractid,changeid){
     //query voting results for change proposal
@@ -188,7 +422,7 @@ async function change_crmmasterdata(connection,api,contractid){
             sql: sqlqueryd,
             values: [contractid]
         },
-        function (error) {
+        async function (error) {
             if (error){
                 throw error;    
             }else {
@@ -202,7 +436,7 @@ async function change_crmmasterdata(connection,api,contractid){
                     connection.query(
                         {
                             sql: sqlquery,
-                            values: [contractid,changeid,element.nickname,element.account,element.percentage]
+                            values: [contractid,element.nickname,element.account,element.percentage]
                         },
                         function (error) {
                             if (error){
@@ -354,18 +588,18 @@ async function add_new_contract(connection,api,contractid){
             }
         );
     });
-    //query other data
+    //query other contracts data
     const crmodata = await api.query.crm.crmOtherContractsData(contractid);
     const crmod = Buffer.from(crmodata.toString().substr(2), 'hex');
-    const jod=JSON.parse(crmod);
+    const jmdo=JSON.parse(crmod);
     // write record
-    jmd.master.forEach(element => {
-        if(element.othercontractid!==undefined){            // other contracts data may be empty
+    jmdo.othercontracts.forEach(element => {
+        if(element.id!==undefined){            // other contracts data may be empty
             let sqlquery="insert into polkamusic.crmothercontractsdata set contractid=?,othercontractid=?,percentage=?";
             connection.query(
                 {
                     sql: sqlquery,
-                    values: [contractid,element.contractid,element.percentage]
+                    values: [contractid,element.id,element.percentage]
                 },
                 function (error) {
                     if (error){
@@ -467,19 +701,19 @@ async function create_database(connection){
     connection.query(q5,function (error, results, fields) {
         if (error) throw error;
     });
-    //creation of CRMDATACHANGEPROPOSAL table
+    //creation of CRMMASTERDATACHANGEPROPOSAL table
     let q6=`CREATE TABLE IF NOT EXISTS crmmasterdatachangeproposal(\n`+
-                `id INT PRIMARY KEY UNIQUE,\n`+         //internal unique id
+                `id INT AUTO_INCREMENT PRIMARY KEY,\n`+ //internal  unique id
                 `changeid INT default 0 NOT NULL,\n`+   //change proposal unique id
                 `contractid INT default 0 NOT NULL,\n`+
                 `nickname VARCHAR(128) DEFAULT '' NOT NULL,\n`+
                 `account VARCHAR(128) DEFAULT '' NOT NULL,\n`+
                 `percentage INT DEFAULT 0 NOT NULL\n`+
                 `)`;
-    connection.query(q,function (error, results, fields) {
+    connection.query(q6,function (error, results, fields) {
         if (error) throw error;
     });
-    //creation of CRMDATACHANGEVOTINGRESULT table
+    //creation of CRMMASTERDATACHANGEVOTINGRESULT table
     let q7=`CREATE TABLE IF NOT EXISTS crmmasterdatachangevotingresult(\n`+
                 `id INT AUTO_INCREMENT PRIMARY KEY,\n`+             //voting results unique id
                 `changeid INT default 0 NOT NULL,\n`+               //change proposal id
@@ -491,6 +725,57 @@ async function create_database(connection){
                 `percvotesno INT DEFAULT 0 NOT NULL\n`+
                 `)`;
     connection.query(q7,function (error, results, fields) {
+        if (error) throw error;
+    });
+    //creation of CRMCOMPOSITIONDATACHANGEPROPOSAL table
+    let q8=`CREATE TABLE IF NOT EXISTS crmcompositiondatachangeproposal(\n`+
+                `id INT AUTO_INCREMENT PRIMARY KEY,\n`+         //internal unique id
+                `changeid INT default 0 NOT NULL,\n`+   //change proposal unique id
+                `contractid INT default 0 NOT NULL,\n`+
+                `nickname VARCHAR(128) DEFAULT '' NOT NULL,\n`+
+                `account VARCHAR(128) DEFAULT '' NOT NULL,\n`+
+                `percentage INT DEFAULT 0 NOT NULL\n`+
+                `)`;
+    connection.query(q8,function (error, results, fields) {
+        if (error) throw error;
+    });
+    //creation of CRMCOMPOSITIONDATACHANGEVOTINGRESULT table
+    let q9=`CREATE TABLE IF NOT EXISTS crmcompositiondatachangevotingresult(\n`+
+                `id INT AUTO_INCREMENT PRIMARY KEY,\n`+             //voting results unique id
+                `changeid INT default 0 NOT NULL,\n`+               //change proposal id
+                `contractid INT default 0 NOT NULL,\n`+             //contract id to be changed
+                `quorum INT DEFAULT 0 NOT NULL,\n`+
+                `nrvotesyes INT DEFAULT 0 NOT NULL,\n`+
+                `nrvotesno INT DEFAULT 0 NOT NULL,\n`+
+                `percvotesyes INT DEFAULT 0 NOT NULL,\n`+
+                `percvotesno INT DEFAULT 0 NOT NULL\n`+
+                `)`;
+    connection.query(q9,function (error, results, fields) {
+        if (error) throw error;
+    });
+    //creation of CRMOTHERCONTACTSDATACHANGEPROPOSAL table
+    let q10=`CREATE TABLE IF NOT EXISTS crmothercontractsdatachangeproposal(\n`+
+                `id INT AUTO_INCREMENT PRIMARY KEY,\n`+         //internal unique id
+                `changeid INT default 0 NOT NULL,\n`+   //change proposal unique id
+                `contractid INT default 0 NOT NULL,\n`+
+                `othercontractid INT default 0 NOT NULL,\n`+
+                `percentage INT DEFAULT 0 NOT NULL\n`+
+                `)`;
+    connection.query(q10,function (error, results, fields) {
+        if (error) throw error;
+    });
+    //creation of CRMOTHERCONTRACTSDATACHANGEVOTINGRESULT table
+    let q11=`CREATE TABLE IF NOT EXISTS crmothercontractsdatachangevotingresult(\n`+
+                `id INT AUTO_INCREMENT PRIMARY KEY,\n`+             //voting results unique id
+                `changeid INT default 0 NOT NULL,\n`+               //change proposal id
+                `contractid INT default 0 NOT NULL,\n`+             //contract id to be changed
+                `quorum INT DEFAULT 0 NOT NULL,\n`+
+                `nrvotesyes INT DEFAULT 0 NOT NULL,\n`+
+                `nrvotesno INT DEFAULT 0 NOT NULL,\n`+
+                `percvotesyes INT DEFAULT 0 NOT NULL,\n`+
+                `percvotesno INT DEFAULT 0 NOT NULL\n`+
+                `)`;
+    connection.query(q11,function (error, results, fields) {
         if (error) throw error;
     });
 }

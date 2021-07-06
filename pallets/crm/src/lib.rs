@@ -86,11 +86,11 @@ decl_event!(
 		CrmMasterDataNewChangeProposal(AccountId, u32,u32),	// A proposal change for master data has been submitted
 		CrmMasterDataChangeVote(AccountId, u32,u32),		// A vote for a crm master data change proposal has been received
 		CrmMasterDataChanged(AccountId, u32),			// Crm master data has been changed
-		CrmCompositionDataNewChangeProposal(AccountId, u32),// A proposal change for composition data has been submitted
-		CrmCompositionDataChangeVote(AccountId, u32),		// A vote for a crm composition data change proposal has been received
+		CrmCompositionDataNewChangeProposal(AccountId, u32, u32),// A proposal change for composition data has been submitted
+		CrmCompositionDataChangeVote(AccountId, u32, u32),		// A vote for a crm composition data change proposal has been received
 		CrmCompositionDataChanged(AccountId, u32),			// Crm composition data has been changed
-		CrmOtherContractsDataNewChangeProposal(AccountId, u32),// A proposal change for Other Contracts data has been submitted
-		CrmOtherContractsDataChangeVote(AccountId, u32),	   // A vote for a crm Other Contracts data change proposal has been received
+		CrmOtherContractsDataNewChangeProposal(AccountId, u32, u32),// A proposal change for Other Contracts data has been submitted
+		CrmOtherContractsDataChangeVote(AccountId, u32, u32),	   // A vote for a crm Other Contracts data change proposal has been received
 		CrmOtherContractsDataChanged(AccountId, u32),		   // Crm Other Contracts data has been changed
 	}
 );
@@ -465,7 +465,7 @@ decl_module! {
 					if jr.len()==0 {
 						break;
 					}
-					// check for nickname
+					// check for id
 					let id=json_get_value(jr.clone(),"id".as_bytes().to_vec());
 					ensure!(id.len() >0, Error::<T>::MissingOtherContractsId); 
 					// convert id from vec to u32
@@ -478,7 +478,7 @@ decl_module! {
                 		Ok(f) => f,
                 		Err(_) => 0,
             		};
-					//debug::info!("id: {} idvalue: {}",id,idvalue)
+					//debug::info!("id: {:?} idvalue: {:?}",id,idvalue);
 					// check that the id is on chain
 					ensure!(CrmData::contains_key(&idvalue)==true, Error::<T>::InvalidContractId);					
 					// check for percentage
@@ -1279,7 +1279,7 @@ decl_module! {
 			};
 			CrmCompositionDataChangeVotingResult::insert(changeid.clone(),v);
 			// Emit an event
-			Self::deposit_event(RawEvent::CrmCompositionDataNewChangeProposal(sender,crmid));
+			Self::deposit_event(RawEvent::CrmCompositionDataNewChangeProposal(sender,crmid,changeid));
 			Ok(())
 		}
 		/// Vote a change proposal for CRM composition data 
@@ -1366,7 +1366,7 @@ decl_module! {
 			CrmCompositionDataChangeVoteCasted::<T>::insert(sender.clone(),changeid.clone(),vote);
 			// Emit an event to alert the user of the vote received
 			//debug::info!("[DEBUG] Emit Event for Vote");
-			Self::deposit_event(RawEvent::CrmCompositionDataChangeVote(sender.clone(),crmid.clone()));
+			Self::deposit_event(RawEvent::CrmCompositionDataChangeVote(sender.clone(),crmid.clone(),changeid.clone()));
 			// if quorum has been reached, we replace the current CRM data with the one voted from the majority
 			if v.percvotesyes>=v.quorum && v.quorum>currentpervotesyes {
 				let crmdata=CrmCompositionDataChangeProposal::get(changeid.clone()).unwrap();
@@ -1482,7 +1482,7 @@ decl_module! {
 			};
 			CrmOtherContractsDataChangeVotingResult::insert(changeid.clone(),v);
 			// Emit an event
-			Self::deposit_event(RawEvent::CrmOtherContractsDataNewChangeProposal(sender,crmid));
+			Self::deposit_event(RawEvent::CrmOtherContractsDataNewChangeProposal(sender,crmid,changeid));
 			Ok(())
 		}
 		/// Vote a change proposal for CRM data 
@@ -1607,7 +1607,7 @@ decl_module! {
 			// store the vote for the account id
 			CrmOtherContractsDataChangeVoteCasted::<T>::insert(sender.clone(),changeid.clone(),vote);
 			// Emit an event to alert the user of the vote received
-			Self::deposit_event(RawEvent::CrmOtherContractsDataChangeVote(sender.clone(),crmid.clone()));
+			Self::deposit_event(RawEvent::CrmOtherContractsDataChangeVote(sender.clone(),crmid.clone(),changeid.clone()));
 			// if quorum has been reached, we replace the current CRM Other Contracts data with the one voted from the majority
 			if v.percvotesyes>=v.quorum && v.quorum>currentpervotesyes {
 				let crmdata=CrmOtherContractsDataChangeProposal::get(changeid.clone()).unwrap();
