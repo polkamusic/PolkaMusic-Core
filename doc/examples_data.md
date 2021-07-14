@@ -1,8 +1,10 @@
 Web3 Foundation Grant Milestone-1 is available on our testnet
 
 Node: testnet.polkamusic.io
+
 Explorer: https://ipfs.io/ipns/dotapps.io/?rpc=wss%3A%2F%2Ftestnet.polkamusic.io#/explorer
-Rights Management Portal: rights.polkamusic.io
+
+Rights Management Portal: https://rights.polkamusic.io
 
 New Contracts: In order to create a new contract, use the newContract method under the crm extrinsic, accessible through the explorer. 
 
