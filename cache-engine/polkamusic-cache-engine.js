@@ -593,24 +593,28 @@ async function add_new_contract(connection,api,contractid){
     const crmod = Buffer.from(crmodata.toString().substr(2), 'hex');
     const jmdo=JSON.parse(crmod);
     // write record
-    jmdo.othercontracts.forEach(element => {
-        if(element.id!==undefined){            // other contracts data may be empty
-            let sqlquery="insert into polkamusic.crmothercontractsdata set contractid=?,othercontractid=?,percentage=?";
-            connection.query(
-                {
-                    sql: sqlquery,
-                    values: [contractid,element.id,element.percentage]
-                },
-                function (error) {
-                    if (error){
-                        if (error.errno!=1062)      //duplicated record is ignored, because it happens in refreshing the cache
-                            throw error;
+    if (typeof jmdo.othercontracts !== 'undefined') {
+        jmdo.othercontracts.forEach(element => {
+            if(element.id!==undefined){            // other contracts data may be empty
+                let sqlquery="insert into polkamusic.crmothercontractsdata set contractid=?,othercontractid=?,percentage=?";
+                connection.query(
+                    {
+                        sql: sqlquery,
+                        values: [contractid,element.id,element.percentage]
+                    },
+                    function (error) {
+                        if (error){
+                            if (error.errno!=1062)      //duplicated record is ignored, because it happens in refreshing the cache
+                                throw error;
+                        }
                     }
-                }
-            );
-        }
-    });    
-    return;
+                );
+            }
+        });    
+        return;
+    } else {
+        return
+    }
 }
 
 //function to create the empty datase and the required tables
