@@ -121,6 +121,14 @@ decl_error! {
         InvalidValue,
         /// Invalid Json Structure
         InvalidJson,
+        /// Invalid Json for Crm Data
+        InvalidJsonCrmData,
+        /// Invalid Json for Crm Master
+        InvalidJsonCrmMaster,
+        /// Invalid Json for Crm Composition
+        InvalidJsonCrmComposition,
+        /// Invalid Json for Crm Other Contracts
+        InvalidJsonCrmOtherContracts,
         /// Duplicated Crm Id
         DuplicatedCrmId,
         /// Invalid Ipfs Hash
@@ -251,7 +259,7 @@ decl_module! {
             ensure!(!CrmData::contains_key(&crmid), Error::<T>::DuplicatedCrmId);
             // check json validity
             let js=crmdata.clone();
-            ensure!(json_check_validity(js),Error::<T>::InvalidJson);
+            ensure!(json_check_validity(js),Error::<T>::InvalidJsonCrmData);
 
             // check ipfshash
             let jsf=crmdata.clone();
@@ -313,7 +321,7 @@ decl_module! {
             // check validity of master data
             let masterclone=master.clone();
             // check for a valid json
-            ensure!(json_check_validity(masterclone),Error::<T>::InvalidJson);
+            ensure!(json_check_validity(masterclone),Error::<T>::InvalidJsonCrmMaster);
             let mut x=0;
             let mut totpercentage:u32 = 0;
             // check validity of records for Master Data
@@ -344,7 +352,7 @@ decl_module! {
             // check validity of composition data
             let compositionclone=composition.clone();
             // check for a valid json
-            ensure!(json_check_validity(compositionclone),Error::<T>::InvalidJson);
+            ensure!(json_check_validity(compositionclone),Error::<T>::InvalidJsonCrmComposition);
             x=0;
             totpercentage=0;
             // check validity of records for Composition Data
@@ -378,7 +386,7 @@ decl_module! {
                 // check validity of othercontracts data
                 let othercontractsclone=othercontracts.clone();
                 // check for a valid json
-                ensure!(json_check_validity(othercontractsclone),Error::<T>::InvalidJson);
+                ensure!(json_check_validity(othercontractsclone),Error::<T>::InvalidJsonCrmOtherContracts);
                 x=0;
                 totpercentage= 0;
                 // check validity of records for other contracts data

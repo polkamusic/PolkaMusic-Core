@@ -304,6 +304,12 @@ You can query the maps stored, to get an updated list you can select "crm" from 
 https://polkadot.js.org/apps/#/chainstate
 
 
+### Testing Suite
+
+A testing suite for the main custom pallet CRM can be executed from the folder .pallets/crm/ executing:  
+```
+cargo test
+```
 
 
 

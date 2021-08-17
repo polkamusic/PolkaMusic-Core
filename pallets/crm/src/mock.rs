@@ -1,4 +1,4 @@
-use crate as pallet_template;
+use crate as pallet_crm;
 use frame_support::parameter_types;
 use frame_system as system;
 use sp_core::H256;
@@ -18,7 +18,7 @@ frame_support::construct_runtime!(
         UncheckedExtrinsic = UncheckedExtrinsic,
     {
         System: frame_system::{Module, Call, Config, Storage, Event<T>},
-        TemplateModule: pallet_template::{Module, Call, Storage, Event<T>},
+        CrmModule: pallet_crm::{Module, Call, Storage, Event<T>},
     }
 );
 
@@ -52,7 +52,7 @@ impl system::Config for Test {
     type SS58Prefix = SS58Prefix;
 }
 
-impl pallet_template::Config for Test {
+impl pallet_crm::Config for Test {
     type Event = Event;
 }
 
